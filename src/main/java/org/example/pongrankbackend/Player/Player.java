@@ -59,6 +59,10 @@ public class Player {
     @Column(name = "category_fdptm", length = 50)
     private String categoryFdptm;
 
+    @Column(name = "federated_declared", nullable = false)
+    @Builder.Default
+    private Boolean federatedDeclared = false;
+
     @Column(name = "rating_glicko", nullable = false)
     @Builder.Default
     private Double ratingGlicko = 1500.0;
