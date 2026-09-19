@@ -4,7 +4,6 @@ import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Friendship.FriendshipStatus;
 import org.example.pongrankbackend.Friendship.dto.FriendshipRequestDTO;
 import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
-import org.example.pongrankbackend.Friendship.mapper.FriendshipMapper;
 import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
@@ -16,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.modelmapper.ModelMapper;
 
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -36,7 +36,7 @@ class FriendshipServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
-    private FriendshipMapper friendshipMapper;
+    private ModelMapper modelMapper;
 
     @InjectMocks
     private FriendshipServiceImpl friendshipService;
@@ -85,7 +85,7 @@ class FriendshipServiceImplTest {
         when(playerRepository.findById(receiverId)).thenReturn(Optional.of(receiver));
         when(friendshipRepository.existsFriendshipBetween(senderId, receiverId)).thenReturn(false);
         when(friendshipRepository.save(any(Friendship.class))).thenReturn(savedFriendship);
-        when(friendshipMapper.toDto(savedFriendship)).thenReturn(responseDto);
+        when(modelMapper.map(savedFriendship, FriendshipResponseDTO.class)).thenReturn(responseDto);
 
         // Act
         FriendshipResponseDTO result = friendshipService.sendFriendRequest(senderId, dto);
@@ -195,7 +195,7 @@ class FriendshipServiceImplTest {
 
         when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
         when(friendshipRepository.save(friendship)).thenReturn(updated);
-        when(friendshipMapper.toDto(updated)).thenReturn(responseDto);
+        when(modelMapper.map(updated, FriendshipResponseDTO.class)).thenReturn(responseDto);
 
         // Act
         FriendshipResponseDTO result = friendshipService.acceptFriendRequest(friendshipId, playerBId);
@@ -320,7 +320,7 @@ class FriendshipServiceImplTest {
 
         when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
         when(friendshipRepository.save(friendship)).thenReturn(updated);
-        when(friendshipMapper.toDto(updated)).thenReturn(responseDto);
+        when(modelMapper.map(updated, FriendshipResponseDTO.class)).thenReturn(responseDto);
 
         // Act
         FriendshipResponseDTO result = friendshipService.rejectFriendRequest(friendshipId, playerBId);
@@ -369,7 +369,7 @@ class FriendshipServiceImplTest {
 
         when(playerRepository.existsById(playerId)).thenReturn(true);
         when(friendshipRepository.findByPlayerBIdAndStatus(playerId, FriendshipStatus.PENDING)).thenReturn(List.of(f1));
-        when(friendshipMapper.toDto(f1)).thenReturn(dto1);
+        when(modelMapper.map(f1, FriendshipResponseDTO.class)).thenReturn(dto1);
 
         // Act
         List<FriendshipResponseDTO> result = friendshipService.getPendingRequests(playerId);
@@ -393,8 +393,8 @@ class FriendshipServiceImplTest {
 
         when(playerRepository.existsById(playerId)).thenReturn(true);
         when(friendshipRepository.findAllByPlayerIdAndStatus(playerId, FriendshipStatus.ACCEPTED)).thenReturn(List.of(f1, f2));
-        when(friendshipMapper.toDto(f1)).thenReturn(dto1);
-        when(friendshipMapper.toDto(f2)).thenReturn(dto2);
+        when(modelMapper.map(f1, FriendshipResponseDTO.class)).thenReturn(dto1);
+        when(modelMapper.map(f2, FriendshipResponseDTO.class)).thenReturn(dto2);
 
         // Act
         List<FriendshipResponseDTO> result = friendshipService.getAcceptedFriends(playerId);

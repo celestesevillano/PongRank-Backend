@@ -4,10 +4,10 @@ import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Friendship.FriendshipStatus;
 import org.example.pongrankbackend.Friendship.dto.FriendshipRequestDTO;
 import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
-import org.example.pongrankbackend.Friendship.mapper.FriendshipMapper;
 import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,14 +20,14 @@ public class FriendshipServiceImpl implements FriendshipService {
 
     private final FriendshipRepository friendshipRepository;
     private final PlayerRepository playerRepository;
-    private final FriendshipMapper friendshipMapper;
+    private final ModelMapper modelMapper;
 
     public FriendshipServiceImpl(FriendshipRepository friendshipRepository,
                                   PlayerRepository playerRepository,
-                                  FriendshipMapper friendshipMapper) {
+                                  ModelMapper modelMapper) {
         this.friendshipRepository = friendshipRepository;
         this.playerRepository = playerRepository;
-        this.friendshipMapper = friendshipMapper;
+        this.modelMapper = modelMapper;
     }
 
     @Override
@@ -58,7 +58,7 @@ public class FriendshipServiceImpl implements FriendshipService {
                 .build();
 
         Friendship savedFriendship = friendshipRepository.save(friendship);
-        return friendshipMapper.toDto(savedFriendship);
+        return modelMapper.map(savedFriendship, FriendshipResponseDTO.class);
     }
 
     @Override
@@ -79,7 +79,7 @@ public class FriendshipServiceImpl implements FriendshipService {
 
         friendship.setStatus(FriendshipStatus.ACCEPTED);
         Friendship updatedFriendship = friendshipRepository.save(friendship);
-        return friendshipMapper.toDto(updatedFriendship);
+        return modelMapper.map(updatedFriendship, FriendshipResponseDTO.class);
     }
 
     @Override
@@ -100,7 +100,7 @@ public class FriendshipServiceImpl implements FriendshipService {
 
         friendship.setStatus(FriendshipStatus.REJECTED);
         Friendship updatedFriendship = friendshipRepository.save(friendship);
-        return friendshipMapper.toDto(updatedFriendship);
+        return modelMapper.map(updatedFriendship, FriendshipResponseDTO.class);
     }
 
     @Override
@@ -112,7 +112,7 @@ public class FriendshipServiceImpl implements FriendshipService {
 
         List<Friendship> friendships = friendshipRepository.findAllByPlayerIdAndStatus(playerId, FriendshipStatus.ACCEPTED);
         return friendships.stream()
-                .map(friendshipMapper::toDto)
+                .map(friendship -> modelMapper.map(friendship, FriendshipResponseDTO.class))
                 .toList();
     }
 
@@ -125,7 +125,7 @@ public class FriendshipServiceImpl implements FriendshipService {
 
         List<Friendship> pendingRequests = friendshipRepository.findByPlayerBIdAndStatus(playerId, FriendshipStatus.PENDING);
         return pendingRequests.stream()
-                .map(friendshipMapper::toDto)
+                .map(friendship -> modelMapper.map(friendship, FriendshipResponseDTO.class))
                 .toList();
     }
 }

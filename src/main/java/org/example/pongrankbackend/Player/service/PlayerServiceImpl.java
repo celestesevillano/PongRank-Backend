@@ -7,8 +7,8 @@ import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
-import org.example.pongrankbackend.Player.mapper.PlayerMapper;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,14 +20,14 @@ import java.util.NoSuchElementException;
 public class PlayerServiceImpl implements PlayerService {
 
     private final PlayerRepository playerRepository;
-    private final PlayerMapper playerMapper;
+    private final ModelMapper modelMapper;
     private final PasswordEncoder passwordEncoder;
 
     public PlayerServiceImpl(PlayerRepository playerRepository,
-                             PlayerMapper playerMapper,
+                             ModelMapper modelMapper,
                              PasswordEncoder passwordEncoder) {
         this.playerRepository = playerRepository;
-        this.playerMapper = playerMapper;
+        this.modelMapper = modelMapper;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -41,7 +41,7 @@ public class PlayerServiceImpl implements PlayerService {
             throw new IllegalArgumentException("El email '" + normalizedEmail + "' ya se encuentra registrado");
         }
 
-        Player player = playerMapper.toEntity(dto);
+        Player player = modelMapper.map(dto, Player.class);
         player.setEmail(normalizedEmail);
         player.setPassword(passwordEncoder.encode(dto.getPassword()));
         player.setRole(Role.ROLE_USER);
@@ -55,21 +55,21 @@ public class PlayerServiceImpl implements PlayerService {
         }
 
         Player savedPlayer = playerRepository.save(player);
-        return playerMapper.toDto(savedPlayer);
+        return modelMapper.map(savedPlayer, PlayerResponseDTO.class);
     }
 
     @Override
     public PlayerResponseDTO getPlayerById(Long id) {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + id)); // TODO: Replace with custom ResourceNotFoundException
-        return playerMapper.toDto(player);
+        return modelMapper.map(player, PlayerResponseDTO.class);
     }
 
     @Override
     public PlayerSummaryDTO getPlayerSummaryById(Long id) {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + id)); // TODO: Replace with custom ResourceNotFoundException
-        return playerMapper.toSummaryDto(player);
+        return modelMapper.map(player, PlayerSummaryDTO.class);
     }
 
     @Override
@@ -78,9 +78,9 @@ public class PlayerServiceImpl implements PlayerService {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + playerId)); // TODO: Replace with custom ResourceNotFoundException
 
-        playerMapper.updateEntityFromDto(dto, player);
+        modelMapper.map(dto, player);
 
         Player updatedPlayer = playerRepository.save(player);
-        return playerMapper.toDto(updatedPlayer);
+        return modelMapper.map(updatedPlayer, PlayerResponseDTO.class);
     }
 }

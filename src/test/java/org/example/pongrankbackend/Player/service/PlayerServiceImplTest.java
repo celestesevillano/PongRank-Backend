@@ -7,7 +7,6 @@ import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
-import org.example.pongrankbackend.Player.mapper.PlayerMapper;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -16,6 +15,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.NoSuchElementException;
@@ -34,7 +34,7 @@ class PlayerServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
-    private PlayerMapper playerMapper;
+    private ModelMapper modelMapper;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -89,10 +89,10 @@ class PlayerServiceImplTest {
                 .build();
 
         when(playerRepository.existsByEmail("carlos.gomez@domain.com")).thenReturn(false);
-        when(playerMapper.toEntity(dto)).thenReturn(mappedPlayer);
+        when(modelMapper.map(dto, Player.class)).thenReturn(mappedPlayer);
         when(passwordEncoder.encode("Password123")).thenReturn("encoded_Password123");
         when(playerRepository.save(any(Player.class))).thenReturn(savedPlayer);
-        when(playerMapper.toDto(savedPlayer)).thenReturn(expectedResponse);
+        when(modelMapper.map(savedPlayer, PlayerResponseDTO.class)).thenReturn(expectedResponse);
 
         // Act
         PlayerResponseDTO actualResponse = playerService.registerPlayer(dto);
@@ -148,7 +148,7 @@ class PlayerServiceImplTest {
         PlayerResponseDTO responseDto = PlayerResponseDTO.builder().id(playerId).name("Carlos Gomez").build();
 
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
-        when(playerMapper.toDto(player)).thenReturn(responseDto);
+        when(modelMapper.map(player, PlayerResponseDTO.class)).thenReturn(responseDto);
 
         // Act
         PlayerResponseDTO result = playerService.getPlayerById(playerId);
@@ -171,7 +171,7 @@ class PlayerServiceImplTest {
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("Jugador no encontrado con ID: 99");
 
-        verify(playerMapper, never()).toDto(any());
+        verify(modelMapper, never()).map(any(), any());
     }
 
     @Test
@@ -183,7 +183,7 @@ class PlayerServiceImplTest {
         PlayerSummaryDTO summaryDto = PlayerSummaryDTO.builder().id(playerId).name("Carlos Gomez").ratingGlicko(1500.0).build();
 
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
-        when(playerMapper.toSummaryDto(player)).thenReturn(summaryDto);
+        when(modelMapper.map(player, PlayerSummaryDTO.class)).thenReturn(summaryDto);
 
         // Act
         PlayerSummaryDTO result = playerService.getPlayerSummaryById(playerId);
@@ -229,9 +229,10 @@ class PlayerServiceImplTest {
                 .shareContact(true)
                 .build();
 
+        doNothing().when(modelMapper).map(updateDto, existingPlayer);
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
         when(playerRepository.save(existingPlayer)).thenReturn(updatedPlayer);
-        when(playerMapper.toDto(updatedPlayer)).thenReturn(expectedResponse);
+        when(modelMapper.map(updatedPlayer, PlayerResponseDTO.class)).thenReturn(expectedResponse);
 
         // Act
         PlayerResponseDTO result = playerService.updatePlayer(playerId, updateDto);
@@ -240,7 +241,7 @@ class PlayerServiceImplTest {
         assertThat(result).isNotNull();
         assertThat(result.getName()).isEqualTo("Carlos Gomez Actualizado");
 
-        verify(playerMapper).updateEntityFromDto(updateDto, existingPlayer);
+        verify(modelMapper).map(updateDto, existingPlayer);
         verify(playerRepository).save(existingPlayer);
     }
 
@@ -259,15 +260,16 @@ class PlayerServiceImplTest {
 
         PlayerUpdateRequestDTO emptyUpdateDto = PlayerUpdateRequestDTO.builder().build();
 
+        doNothing().when(modelMapper).map(emptyUpdateDto, existingPlayer);
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
         when(playerRepository.save(existingPlayer)).thenReturn(existingPlayer);
-        when(playerMapper.toDto(existingPlayer)).thenReturn(PlayerResponseDTO.builder().id(playerId).name("Carlos Gomez").build());
+        when(modelMapper.map(existingPlayer, PlayerResponseDTO.class)).thenReturn(PlayerResponseDTO.builder().id(playerId).name("Carlos Gomez").build());
 
         // Act
         playerService.updatePlayer(playerId, emptyUpdateDto);
 
         // Assert
-        verify(playerMapper).updateEntityFromDto(emptyUpdateDto, existingPlayer);
+        verify(modelMapper).map(emptyUpdateDto, existingPlayer);
         verify(playerRepository).save(existingPlayer);
     }
 }
