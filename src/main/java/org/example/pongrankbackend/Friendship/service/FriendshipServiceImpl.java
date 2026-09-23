@@ -7,12 +7,13 @@ import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
 import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @Service
 @Transactional(readOnly = true)
@@ -41,14 +42,13 @@ public class FriendshipServiceImpl implements FriendshipService {
         }
 
         Player sender = playerRepository.findById(senderId)
-                .orElseThrow(() -> new NoSuchElementException("Jugador emisor no encontrado con ID: " + senderId)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador emisor no encontrado con ID: " + senderId));
 
         Player receiver = playerRepository.findById(receiverId)
-                .orElseThrow(() -> new NoSuchElementException("Jugador receptor no encontrado con ID: " + receiverId)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador receptor no encontrado con ID: " + receiverId));
 
         if (friendshipRepository.existsFriendshipBetween(senderId, receiverId)) {
-            // TODO: Replace with custom DuplicateResourceException / ConflictException
-            throw new IllegalStateException("Ya existe una relación de amistad o solicitud pendiente entre ambos jugadores");
+            throw new ConflictException("Ya existe una relación de amistad o solicitud pendiente entre ambos jugadores");
         }
 
         Friendship friendship = Friendship.builder()
@@ -65,7 +65,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     @Transactional
     public FriendshipResponseDTO acceptFriendRequest(Long friendshipId, Long actingPlayerId) {
         Friendship friendship = friendshipRepository.findById(friendshipId)
-                .orElseThrow(() -> new NoSuchElementException("Solicitud de amistad no encontrada con ID: " + friendshipId)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitud de amistad no encontrada con ID: " + friendshipId));
 
         if (!friendship.getPlayerB().getId().equals(actingPlayerId)) {
             // TODO: Replace with custom ForbiddenException / AccessDeniedException
@@ -86,7 +86,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     @Transactional
     public FriendshipResponseDTO rejectFriendRequest(Long friendshipId, Long actingPlayerId) {
         Friendship friendship = friendshipRepository.findById(friendshipId)
-                .orElseThrow(() -> new NoSuchElementException("Solicitud de amistad no encontrada con ID: " + friendshipId)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitud de amistad no encontrada con ID: " + friendshipId));
 
         if (!friendship.getPlayerB().getId().equals(actingPlayerId)) {
             // TODO: Replace with custom ForbiddenException / AccessDeniedException
@@ -106,8 +106,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     @Override
     public List<FriendshipResponseDTO> getAcceptedFriends(Long playerId) {
         if (!playerRepository.existsById(playerId)) {
-            // TODO: Replace with custom ResourceNotFoundException
-            throw new NoSuchElementException("Jugador no encontrado con ID: " + playerId);
+            throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }
 
         List<Friendship> friendships = friendshipRepository.findAllByPlayerIdAndStatus(playerId, FriendshipStatus.ACCEPTED);
@@ -119,8 +118,7 @@ public class FriendshipServiceImpl implements FriendshipService {
     @Override
     public List<FriendshipResponseDTO> getPendingRequests(Long playerId) {
         if (!playerRepository.existsById(playerId)) {
-            // TODO: Replace with custom ResourceNotFoundException
-            throw new NoSuchElementException("Jugador no encontrado con ID: " + playerId);
+            throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }
 
         List<Friendship> pendingRequests = friendshipRepository.findByPlayerBIdAndStatus(playerId, FriendshipStatus.PENDING);
