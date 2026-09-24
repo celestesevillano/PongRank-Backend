@@ -5,9 +5,12 @@ import org.example.pongrankbackend.Community.Community;
 import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Match.Match;
+import org.example.pongrankbackend.Match.MatchFormat;
 import org.example.pongrankbackend.Match.MatchStatus;
+import org.example.pongrankbackend.Match.MatchType;
 import org.example.pongrankbackend.Match.dto.*;
 import org.example.pongrankbackend.Match.event.MatchConfirmedEvent;
+import org.example.pongrankbackend.Tournament.Tournament;
 import org.example.pongrankbackend.Match.repository.MatchRepository;
 import org.example.pongrankbackend.Match.websocket.MatchWebSocketNotifier;
 import org.example.pongrankbackend.MatchSet.MatchSet;
@@ -95,10 +98,19 @@ public class MatchServiceImpl implements MatchService {
             }
         }
 
+        Tournament tournament = null;
+        if (dto.getTournamentId() != null) {
+            tournament = entityManager.find(Tournament.class, dto.getTournamentId());
+            if (tournament == null) {
+                throw new ResourceNotFoundException("Torneo no encontrado con ID: " + dto.getTournamentId());
+            }
+        }
+
         Match match = Match.builder()
                 .player1(creator)
                 .player2(opponent)
                 .community(community)
+                .tournament(tournament)
                 .format(dto.getFormat())
                 .matchType(dto.getMatchType())
                 .status(MatchStatus.CREATED)
@@ -113,6 +125,36 @@ public class MatchServiceImpl implements MatchService {
         webSocketNotifier.notifyMatchCreated(savedMatch, responseDTO);
 
         return responseDTO;
+    }
+
+    @Override
+    @Transactional
+    public Match createTournamentMatch(Player player1, Player player2, Tournament tournament, MatchFormat format) {
+        if (player1 == null || player2 == null) {
+            throw new IllegalArgumentException("Ambos jugadores son obligatorios para crear una partida de torneo");
+        }
+        if (player1.getId().equals(player2.getId())) {
+            throw new InvalidMatchStateException("Un jugador no puede crear un partido contra sí mismo");
+        }
+
+        Match match = Match.builder()
+                .player1(player1)
+                .player2(player2)
+                .tournament(tournament)
+                .format(format != null ? format : MatchFormat.BO3)
+                .matchType(MatchType.TOURNAMENT)
+                .status(MatchStatus.CREATED)
+                .build();
+
+        Match savedMatch = matchRepository.save(match);
+        webSocketNotifier.notifyMatchCreated(savedMatch, toResponseDTO(savedMatch));
+        return savedMatch;
+    }
+
+    @Override
+    @Transactional
+    public Match createTournamentMatch(Player player1, Player player2, MatchFormat format) {
+        return createTournamentMatch(player1, player2, null, format);
     }
 
     @Override
@@ -167,6 +209,16 @@ public class MatchServiceImpl implements MatchService {
     }
 
     @Override
+    public Page<MatchResponseDTO> getMatchesByTournament(Long tournamentId, Pageable pageable) {
+        Tournament tournament = entityManager.find(Tournament.class, tournamentId);
+        if (tournament == null) {
+            throw new ResourceNotFoundException("Torneo no encontrado con ID: " + tournamentId);
+        }
+        return matchRepository.findByTournamentId(tournamentId, pageable)
+                .map(this::toResponseDTO);
+    }
+
+    @Override
     @Transactional
     public MatchDetailResponseDTO submitScore(Long matchId, Long submittingPlayerId, MatchScoreSubmitDTO dto) {
         Match match = matchRepository.findById(matchId)
@@ -192,13 +244,13 @@ public class MatchServiceImpl implements MatchService {
         MatchRuleValidator.MatchValidationResult validationResult =
                 matchRuleValidator.validateSetScoresAndDetermineWinner(match.getFormat(), dto.getSets());
 
-        // Limpiar sets previos si existían y persistir los nuevos sets validados
-        if (match.getSets() != null && !match.getSets().isEmpty()) {
-            matchSetRepository.deleteByMatchId(match.getId());
+        // Limpiar sets previos si existían y persistir los nuevos sets validados sobre la colección existente
+        if (match.getSets() == null) {
+            match.setSets(new ArrayList<>());
+        } else {
             match.getSets().clear();
         }
 
-        List<MatchSet> newSets = new ArrayList<>();
         for (MatchSetRequestDTO setDto : dto.getSets()) {
             MatchSet matchSet = MatchSet.builder()
                     .match(match)
@@ -206,9 +258,8 @@ public class MatchServiceImpl implements MatchService {
                     .scorePlayer1(setDto.getScorePlayer1())
                     .scorePlayer2(setDto.getScorePlayer2())
                     .build();
-            newSets.add(matchSetRepository.save(matchSet));
+            match.getSets().add(matchSet);
         }
-        match.setSets(newSets);
 
         // Actualizar estado según quién propuso el marcador
         MatchStatus proposedStatus = isP1 ? MatchStatus.PROPOSED_P1 : MatchStatus.PROPOSED_P2;
@@ -342,6 +393,9 @@ public class MatchServiceImpl implements MatchService {
         Long commId = match.getCommunity() != null ? match.getCommunity().getId() : null;
         String commName = match.getCommunity() != null ? match.getCommunity().getName() : null;
 
+        Long tourId = match.getTournament() != null ? match.getTournament().getId() : null;
+        String tourName = match.getTournament() != null ? match.getTournament().getName() : null;
+
         String scoreSummary = null;
         Long winnerId = null;
 
@@ -360,6 +414,8 @@ public class MatchServiceImpl implements MatchService {
                 .player2(p2)
                 .communityId(commId)
                 .communityName(commName)
+                .tournamentId(tourId)
+                .tournamentName(tourName)
                 .format(match.getFormat())
                 .matchType(match.getMatchType())
                 .status(match.getStatus())
@@ -396,6 +452,8 @@ public class MatchServiceImpl implements MatchService {
                 .player2(base.getPlayer2())
                 .communityId(base.getCommunityId())
                 .communityName(base.getCommunityName())
+                .tournamentId(base.getTournamentId())
+                .tournamentName(base.getTournamentName())
                 .format(base.getFormat())
                 .matchType(base.getMatchType())
                 .status(base.getStatus())

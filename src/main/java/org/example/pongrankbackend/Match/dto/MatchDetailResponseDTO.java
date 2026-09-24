@@ -26,6 +26,8 @@ public class MatchDetailResponseDTO {
     private PlayerSummaryDTO player2;
     private Long communityId;
     private String communityName;
+    private Long tournamentId;
+    private String tournamentName;
     private MatchFormat format;
     private MatchType matchType;
     private MatchStatus status;
