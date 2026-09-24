@@ -8,6 +8,8 @@ import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -132,7 +133,7 @@ class PlayerServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> playerService.registerPlayer(dto))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(EmailAlreadyExistsException.class)
                 .hasMessageContaining("ya se encuentra registrado");
 
         verify(playerRepository, never()).save(any());
@@ -160,7 +161,7 @@ class PlayerServiceImplTest {
     }
 
     @Test
-    @DisplayName("getPlayerById: lanza NoSuchElementException cuando el jugador no existe")
+    @DisplayName("getPlayerById: lanza ResourceNotFoundException cuando el jugador no existe")
     void getPlayerById_NotFound_ThrowsException() {
         // Arrange
         Long playerId = 99L;
@@ -168,7 +169,7 @@ class PlayerServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> playerService.getPlayerById(playerId))
-                .isInstanceOf(NoSuchElementException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Jugador no encontrado con ID: 99");
 
         verify(modelMapper, never()).map(any(), any());
