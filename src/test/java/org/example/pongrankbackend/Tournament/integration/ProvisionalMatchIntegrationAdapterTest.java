@@ -8,6 +8,7 @@ import org.example.pongrankbackend.Match.repository.MatchRepository;
 import org.example.pongrankbackend.Match.service.MatchService;
 import org.example.pongrankbackend.MatchSet.dto.MatchSetResponseDTO;
 import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -68,12 +69,16 @@ class ProvisionalMatchIntegrationAdapterTest {
     void findConfirmedOutcome_UsesMatchServiceResult() {
         when(matchService.getMatchById(7L)).thenReturn(MatchDetailResponseDTO.builder()
                 .id(7L).status(MatchStatus.CONFIRMED).winnerId(2L)
+                .player1(PlayerSummaryDTO.builder().id(1L).build())
+                .player2(PlayerSummaryDTO.builder().id(2L).build())
                 .sets(List.of(set(1, 11, 9), set(2, 8, 11), set(3, 10, 12), set(4, 5, 11)))
                 .build());
 
         Optional<MatchOutcome> outcome = adapter.findConfirmedOutcome(matchWithId(7L));
 
         assertThat(outcome).isPresent();
+        assertThat(outcome.get().player1Id()).isEqualTo(1L);
+        assertThat(outcome.get().player2Id()).isEqualTo(2L);
         assertThat(outcome.get().winnerPlayerId()).isEqualTo(2L);
         assertThat(outcome.get().setsPlayer1()).isEqualTo(1);
         assertThat(outcome.get().setsPlayer2()).isEqualTo(3);
@@ -95,5 +100,21 @@ class ProvisionalMatchIntegrationAdapterTest {
     void findConfirmedOutcome_NoMatch_Empty() {
         assertThat(adapter.findConfirmedOutcome(null)).isEmpty();
         verifyNoInteractions(matchService);
+    }
+
+    @Test
+    @DisplayName("hasReportedScore: CREATED o CANCELLED no tienen marcador; PROPOSED/CONFIRMED/DISPUTED sí")
+    void hasReportedScore_DependsOnMatchStatus() {
+        when(matchService.getMatchById(7L)).thenReturn(
+                MatchDetailResponseDTO.builder().id(7L).status(MatchStatus.CREATED).build(),
+                MatchDetailResponseDTO.builder().id(7L).status(MatchStatus.CANCELLED).build(),
+                MatchDetailResponseDTO.builder().id(7L).status(MatchStatus.PROPOSED_P1).build(),
+                MatchDetailResponseDTO.builder().id(7L).status(MatchStatus.DISPUTED).build());
+
+        assertThat(adapter.hasReportedScore(matchWithId(7L))).isFalse();
+        assertThat(adapter.hasReportedScore(matchWithId(7L))).isFalse();
+        assertThat(adapter.hasReportedScore(matchWithId(7L))).isTrue();
+        assertThat(adapter.hasReportedScore(matchWithId(7L))).isTrue();
+        assertThat(adapter.hasReportedScore(null)).isFalse();
     }
 }

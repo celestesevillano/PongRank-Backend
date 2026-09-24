@@ -192,9 +192,15 @@ request POST "/api/v1/tournaments/$T/participants?actingPlayerId=$A" "{\"playerI
 check "participant list closed after start -> 409" 409
 request GET "/api/v1/tournaments/$T/matches"
 assert_eq "6 round robin matches (2 groups of 3)" "6" "$(echo "$BODY" | json "len(d)")"
+assert_eq "each tournament match has its own real Match (no duplicates)" "6" "$(echo "$BODY" | json "len({m['matchId'] for m in d if m.get('matchId')})")"
 
 echo "== 5. Group results (1 W.O. via API, the rest played through the Match module)"
 WO_TM=$(echo "$BODY" | json "d[0]['id']"); WO_ABSENT=$(echo "$BODY" | json "d[0]['player2']['id']")
+WO_MATCH=$(echo "$BODY" | json "d[0]['matchId']")
+sql "UPDATE matches SET status='PROPOSED_P1' WHERE id=$WO_MATCH;"
+request POST "/api/v1/tournaments/$T/matches/$WO_TM/walkover?actingPlayerId=$A" "{\"absentPlayerId\":$WO_ABSENT}"
+check "W.O. rejected when a score was already reported in Match -> 409" 409
+sql "UPDATE matches SET status='CREATED' WHERE id=$WO_MATCH;"
 request POST "/api/v1/tournaments/$T/matches/$WO_TM/walkover?actingPlayerId=$A" "{\"absentPlayerId\":$H}"
 check "W.O. with a player outside the match -> 400" 400
 request POST "/api/v1/tournaments/$T/matches/$WO_TM/walkover?actingPlayerId=$A" "{\"absentPlayerId\":$WO_ABSENT}"

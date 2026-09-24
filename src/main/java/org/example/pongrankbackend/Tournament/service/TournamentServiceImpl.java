@@ -436,6 +436,10 @@ public class TournamentServiceImpl implements TournamentService {
         if (!match.hasPlayer(dto.getAbsentPlayerId())) {
             throw new InvalidMatchStateException("El jugador ausente no participa en este partido");
         }
+        // A W.O. never overwrites a score already reported in the Match module
+        if (matchIntegrationPort.hasReportedScore(match.getMatch())) {
+            throw new ConflictException("El partido ya tiene un marcador reportado en Match; no se puede declarar W.O.");
+        }
 
         boolean player1Absent = match.getPlayer1().getId().equals(dto.getAbsentPlayerId());
         match.setWinner(player1Absent ? match.getPlayer2() : match.getPlayer1());
@@ -472,21 +476,35 @@ public class TournamentServiceImpl implements TournamentService {
     }
 
     private void applyOutcome(Tournament tournament, TournamentMatch match, MatchOutcome outcome) {
+        // The real Match must have been played by exactly the two players of this tournament match
+        Long player1Id = match.getPlayer1().getId();
+        Long player2Id = match.getPlayer2().getId();
+        boolean sameOrder = player1Id.equals(outcome.player1Id()) && player2Id.equals(outcome.player2Id());
+        boolean swapped = player1Id.equals(outcome.player2Id()) && player2Id.equals(outcome.player1Id());
+        if (!sameOrder && !swapped) {
+            throw new ConflictException("Resultado inválido: los jugadores del Match no coinciden con el partido " + match.getId());
+        }
         if (!match.hasPlayer(outcome.winnerPlayerId())) {
             throw new ConflictException("Resultado inválido: el ganador no participa en el partido " + match.getId());
         }
 
-        boolean player1Won = match.getPlayer1().getId().equals(outcome.winnerPlayerId());
-        int winnerSets = player1Won ? outcome.setsPlayer1() : outcome.setsPlayer2();
-        int loserSets = player1Won ? outcome.setsPlayer2() : outcome.setsPlayer1();
+        // Express sets and points from the tournament match's point of view
+        int sets1 = sameOrder ? outcome.setsPlayer1() : outcome.setsPlayer2();
+        int sets2 = sameOrder ? outcome.setsPlayer2() : outcome.setsPlayer1();
+        int points1 = sameOrder ? outcome.pointsPlayer1() : outcome.pointsPlayer2();
+        int points2 = sameOrder ? outcome.pointsPlayer2() : outcome.pointsPlayer1();
+
+        boolean player1Won = player1Id.equals(outcome.winnerPlayerId());
+        int winnerSets = player1Won ? sets1 : sets2;
+        int loserSets = player1Won ? sets2 : sets1;
         if (winnerSets <= loserSets) {
             throw new ConflictException("Resultado inválido: el ganador debe tener más sets que el perdedor en el partido " + match.getId());
         }
 
-        match.setSetsPlayer1(outcome.setsPlayer1());
-        match.setSetsPlayer2(outcome.setsPlayer2());
-        match.setPointsPlayer1(outcome.pointsPlayer1());
-        match.setPointsPlayer2(outcome.pointsPlayer2());
+        match.setSetsPlayer1(sets1);
+        match.setSetsPlayer2(sets2);
+        match.setPointsPlayer1(points1);
+        match.setPointsPlayer2(points2);
         match.setWinner(player1Won ? match.getPlayer1() : match.getPlayer2());
         match.setStatus(TournamentMatchStatus.COMPLETED);
 
@@ -531,7 +549,13 @@ public class TournamentServiceImpl implements TournamentService {
     }
 
     private void schedule(Tournament tournament, TournamentMatch match) {
-        match.setMatch(matchIntegrationPort.createMatch(match.getPlayer1(), match.getPlayer2(), tournament.getMatchFormat()));
+        if (match.getPlayer1().getId().equals(match.getPlayer2().getId())) {
+            throw new ConflictException("Un jugador no puede enfrentarse a sí mismo");
+        }
+        // Never create a second real Match for the same tournament match
+        if (match.getMatch() == null) {
+            match.setMatch(matchIntegrationPort.createMatch(match.getPlayer1(), match.getPlayer2(), tournament.getMatchFormat()));
+        }
         match.setStatus(TournamentMatchStatus.SCHEDULED);
     }
 

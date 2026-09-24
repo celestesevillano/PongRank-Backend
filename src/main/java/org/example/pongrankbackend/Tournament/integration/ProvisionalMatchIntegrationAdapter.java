@@ -20,7 +20,11 @@ import java.util.Optional;
  *
  * CREATION (PROVISIONAL): MatchService.createMatch only accepts FRIEND, COMMUNITY or LOCATION matches
  * (FRIEND requires a friendship), so tournament matches cannot be created through it yet. Until the Match
- * module offers a tournament contract (e.g. MatchType.TOURNAMENT), the Match row is saved with its repository.
+ * module offers a tournament contract, the Match row is saved with its repository. Agreed with Adriana: Match will
+ * allow a match between two players registered in the same tournament (without friendship, community or location);
+ * FRIEND/COMMUNITY/LOCATION stay as they are and no MatchType.TOURNAMENT is added from here.
+ * Note: until that contract exists, the provisional row keeps Match's default matchType (FRIEND).
+ * When the contract is published, only createMatch changes; the rest of Tournament uses this port.
  */
 @Component
 public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort {
@@ -68,6 +72,16 @@ public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort 
                 setsPlayer2++;
             }
         }
-        return Optional.of(new MatchOutcome(detail.getWinnerId(), setsPlayer1, setsPlayer2, pointsPlayer1, pointsPlayer2));
+        return Optional.of(new MatchOutcome(detail.getPlayer1().getId(), detail.getPlayer2().getId(), detail.getWinnerId(),
+                setsPlayer1, setsPlayer2, pointsPlayer1, pointsPlayer2));
+    }
+
+    @Override
+    public boolean hasReportedScore(Match match) {
+        if (match == null || match.getId() == null) {
+            return false;
+        }
+        MatchStatus status = matchService.getMatchById(match.getId()).getStatus();
+        return status != MatchStatus.CREATED && status != MatchStatus.CANCELLED;
     }
 }

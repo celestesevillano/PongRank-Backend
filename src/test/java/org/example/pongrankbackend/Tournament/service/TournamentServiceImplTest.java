@@ -305,6 +305,67 @@ class TournamentServiceImplTest {
     }
 
     @Test
+    @DisplayName("declareWalkover: no se permite si ya hay un marcador reportado en Match")
+    void declareWalkover_ScoreAlreadyReported_Throws() {
+        Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
+        Match real = new Match();
+        TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
+                .groupNumber(1).player1(player(11L, 1500)).player2(player(12L, 1500)).match(real)
+                .status(TournamentMatchStatus.SCHEDULED).build();
+        when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
+        when(tournamentMatchRepository.findById(500L)).thenReturn(Optional.of(match));
+        when(matchIntegrationPort.hasReportedScore(real)).thenReturn(true);
+
+        assertThatThrownBy(() -> tournamentService.declareWalkover(TOURNAMENT_ID, 500L, ADMIN_ID, new TournamentWalkoverRequestDTO(11L)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("marcador reportado");
+        assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.SCHEDULED);
+        assertThat(match.getWinner()).isNull();
+    }
+
+    @Test
+    @DisplayName("syncMatchResults: rechaza un Match jugado por otros jugadores")
+    void syncMatchResults_DifferentPlayers_Throws() {
+        Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
+        Match real = new Match();
+        TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
+                .groupNumber(1).player1(player(11L, 1500)).player2(player(12L, 1500)).match(real)
+                .status(TournamentMatchStatus.SCHEDULED).build();
+        when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
+        when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
+        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 99L, 11L, 2, 0, 22, 10)));
+
+        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
+                .isInstanceOf(ConflictException.class)
+                .hasMessageContaining("no coinciden");
+        assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.SCHEDULED);
+    }
+
+    @Test
+    @DisplayName("syncMatchResults: si el Match tiene a los jugadores en orden inverso, los sets se reorientan")
+    void syncMatchResults_SwappedPlayers_Reoriented() {
+        Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
+        Player p1 = player(11L, 1500);
+        Match real = new Match();
+        TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
+                .groupNumber(1).player1(p1).player2(player(12L, 1500)).match(real)
+                .status(TournamentMatchStatus.SCHEDULED).build();
+        when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
+        when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
+        // In the Match, player1 is 12 and player2 is 11; player 11 wins 2-1
+        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(12L, 11L, 11L, 1, 2, 28, 31)));
+
+        tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID);
+
+        assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.COMPLETED);
+        assertThat(match.getWinner()).isEqualTo(p1);
+        assertThat(match.getSetsPlayer1()).isEqualTo(2);
+        assertThat(match.getSetsPlayer2()).isEqualTo(1);
+        assertThat(match.getPointsPlayer1()).isEqualTo(31);
+        assertThat(match.getPointsPlayer2()).isEqualTo(28);
+    }
+
+    @Test
     @DisplayName("syncMatchResults: rechaza un resultado cuyo ganador no juega el partido")
     void syncMatchResults_WinnerNotInMatch_Throws() {
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
@@ -314,7 +375,7 @@ class TournamentServiceImplTest {
                 .status(TournamentMatchStatus.SCHEDULED).build();
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
-        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(999L, 2, 0, 22, 10)));
+        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 12L, 999L, 2, 0, 22, 10)));
 
         assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
                 .isInstanceOf(ConflictException.class)
@@ -332,7 +393,7 @@ class TournamentServiceImplTest {
                 .status(TournamentMatchStatus.SCHEDULED).build();
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
-        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 1, 2, 30, 31)));
+        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 12L, 11L, 1, 2, 30, 31)));
 
         assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
                 .isInstanceOf(ConflictException.class);
@@ -355,7 +416,7 @@ class TournamentServiceImplTest {
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(semifinal, finalMatch));
         when(matchIntegrationPort.findConfirmedOutcome(any())).thenAnswer(i -> i.getArgument(0) == semifinalMatch
-                ? Optional.of(new MatchOutcome(11L, 2, 1, 30, 25))
+                ? Optional.of(new MatchOutcome(11L, 12L, 11L, 2, 1, 30, 25))
                 : Optional.empty());
         when(tournamentMatchRepository.findByTournamentIdAndStageAndRoundAndBracketPosition(TOURNAMENT_ID, TournamentStage.KNOCKOUT, 2, 0))
                 .thenReturn(Optional.of(finalMatch));
@@ -382,7 +443,7 @@ class TournamentServiceImplTest {
                 .status(TournamentMatchStatus.SCHEDULED).build();
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(finalMatch));
-        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(12L, 1, 3, 40, 44)));
+        when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 12L, 12L, 1, 3, 40, 44)));
 
         tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID);
 

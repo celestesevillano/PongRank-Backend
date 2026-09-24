@@ -17,4 +17,8 @@ public interface MatchIntegrationPort {
 
     // Returns the result only when the Match module considers the match CONFIRMED
     Optional<MatchOutcome> findConfirmedOutcome(Match match);
+
+    // True when a player already reported (or confirmed/disputed) a score in the Match module.
+    // A W.O. is only allowed while nothing has been reported, so a real result is never overwritten.
+    boolean hasReportedScore(Match match);
 }

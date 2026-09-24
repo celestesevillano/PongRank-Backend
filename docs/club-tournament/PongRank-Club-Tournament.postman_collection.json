@@ -1422,11 +1422,49 @@
                 }
               ]
             },
-            "description": "",
+            "description": "Gana el jugador presente, sin sets ni puntos inventados. 400 si el ausente no juega el partido; 409 si ya hay un marcador reportado en Match o el partido no está SCHEDULED.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"absentPlayerId\": {{playerId}}\n}"
             }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sincronizar resultados de Match (admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/sync-results?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "sync-results"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "Lee con MatchService.getMatchById los partidos CONFIRMED y actualiza grupos y llave. Normalmente no hace falta: la llave avanza sola con MatchConfirmedEvent. 409 si el Match lo jugaron otros jugadores."
           },
           "event": [
             {

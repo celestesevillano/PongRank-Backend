@@ -32,8 +32,18 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5435/pongrank_it PORT=8081 ./m
 ./docs/club-tournament/integration-test.sh http://localhost:8081
 ```
 Esperado al final: `RESULT: N passed, 0 failed`.
-El puerto 5435 viene de tu `docker-compose.override.yml`. Los partidos se juegan con los endpoints reales del
-módulo Match (`submit` + `confirm`) y la llave avanza sola gracias a `MatchConfirmedEvent`.
+El puerto 5435 viene de tu `docker-compose.override.yml`. Cualquier 500 cuenta como fallo.
+
+El cuarto parámetro elige cómo se juegan los partidos:
+
+| Modo | Qué hace | Cuándo usarlo |
+|---|---|---|
+| `http` (por defecto) | Los jugadores usan `submit` + `confirm` de Match y la llave avanza sola con `MatchConfirmedEvent` | Prueba de extremo a extremo |
+| `sql` | Escribe en `pongrank_it` un resultado CONFIRMED con sus sets y llama a `sync-results`, que lo lee con `MatchService.getMatchById` | Verificar Tournament mientras `submitScore` tenga el defecto de la sección 7 |
+
+```bash
+./docs/club-tournament/integration-test.sh http://localhost:8081 pongrank-postgres pongrank_it sql
+```
 
 ## 3. Postman
 Importar `PongRank-Club-Tournament.postman_collection.json` y ajustar las variables
@@ -105,5 +115,23 @@ funcionalidad. Es idempotente, solo inserta y **no se ha ejecutado**: requiere a
 | Registrar y validar marcadores (sets a 11, deuce, BO3/BO5/BO7) | Integrado: los jugadores usan `POST /api/v1/matches/{id}/submit` y `PUT /api/v1/matches/{id}/confirm` |
 | Ganador, sets y estado del partido | Integrado: `MatchService.getMatchById` (`winnerId`, `sets`) |
 | Avance automático de la llave | Integrado: `TournamentMatchEventListener` escucha `MatchConfirmedEvent` |
-| Crear el partido de un torneo | **Provisional**: `MatchService.createMatch` solo acepta FRIEND/COMMUNITY/LOCATION (FRIEND exige amistad). Se guarda con `MatchRepository`. Contrato pedido: `MatchType.TOURNAMENT` o `createTournamentMatch(player1, player2, format)` |
-| Anular el `Match` de un W.O. | Pendiente: `cancelMatch` exige que actúe un jugador participante; el W.O. lo declara el admin del torneo |
+| Crear el partido de un torneo | **Provisional**: `MatchService.createMatch` todavía solo acepta FRIEND/COMMUNITY/LOCATION (FRIEND exige amistad). Mientras tanto, `ProvisionalMatchIntegrationAdapter` guarda el `Match` con `MatchRepository` (queda con el `matchType` por defecto, FRIEND). Ver el acuerdo abajo |
+| Participantes correctos | Integrado: Tournament comprueba que el `Match` confirmado lo jugaron exactamente los dos jugadores del enfrentamiento (si vienen en orden inverso, reorienta sets y puntos); si no coinciden → 409 |
+| Sin duplicados | Integrado: cada enfrentamiento tiene como máximo un `Match` (`match_id` único y `schedule` no crea un segundo) |
+| W.O. | Integrado sin inventar sets ni puntos: gana el presente y los sets/puntos quedan vacíos. Se rechaza con 409 si ya hay un marcador reportado en Match (PROPOSED, CONFIRMED o DISPUTED) |
+| Anular el `Match` de un W.O. | Pendiente: el `Match` queda en CREATED y Tournament lo ignora; `cancelMatch` exige que actúe un jugador participante y el W.O. lo declara el admin del torneo |
+
+### Acuerdo con Adriana (Match)
+- Match permitirá crear un partido entre dos jugadores inscritos en el mismo torneo, aunque no sean amigos, no
+  compartan comunidad ni estén cerca. FRIEND, COMMUNITY y LOCATION se conservan; Tournament **no** agrega
+  `MatchType.TOURNAMENT` por su cuenta.
+- El admin de un club APPROVED crea el torneo e inscribe participantes; Tournament genera los enfrentamientos;
+  Match gestiona sets y resultados; Tournament actualiza clasificación y llave tras la confirmación.
+- INTERNAL: jugadores ACTIVE con membresía APPROVED en el club organizador. OPEN: cualquier jugador ACTIVE, aunque
+  no pertenezca a un club. Inscribirse no crea membresía.
+- Cuando Adriana publique el método en `main`, solo cambia `ProvisionalMatchIntegrationAdapter.createMatch`.
+
+### Pendiente en Match (no se modificó desde esta rama)
+`MatchServiceImpl.submitScore` hace `match.setSets(newSets)` sobre una colección con `orphanRemoval = true`.
+Hibernate lanza `JpaSystemException: A collection with orphan deletion was no longer referenced...` y el endpoint
+responde 500. Corrección sugerida: `match.getSets().clear(); match.getSets().addAll(newSets);`.
