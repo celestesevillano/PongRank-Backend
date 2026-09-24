@@ -1,0 +1,1564 @@
+{
+  "info": {
+    "name": "PongRank - Club, ClubMembership y Tournament",
+    "description": "actingPlayerId es PROVISIONAL (no es autenticación segura) hasta integrar JWT. Errores: 404 recurso inexistente, 409 conflicto de negocio, 403 sin permiso, 400 validación.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "systemAdminId",
+      "value": "1"
+    },
+    {
+      "key": "clubAdminId",
+      "value": "2"
+    },
+    {
+      "key": "playerId",
+      "value": "3"
+    },
+    {
+      "key": "clubId",
+      "value": ""
+    },
+    {
+      "key": "membershipId",
+      "value": ""
+    },
+    {
+      "key": "tournamentId",
+      "value": ""
+    },
+    {
+      "key": "tournamentMatchId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Club",
+      "item": [
+        {
+          "name": "Registrar club (admin del club)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Club Norte\",\n  \"address\": \"Av. Primavera 123\",\n  \"affiliationDocumentUrl\": \"https://docs.test/afiliacion.pdf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('clubId', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clubes aprobados (público) [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle público del club",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar nombre/dirección (admin del club)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"address\": \"Av. Arequipa 456\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Revisión privada: motivo de rechazo (admin del club)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/review?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "review"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reenviar club rechazado",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/resubmit?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "resubmit"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"affiliationDocumentUrl\": \"https://docs.test/afiliacion-corregida.pdf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reemplazar documento (APPROVED vuelve a PENDING)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/affiliation-document?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "affiliation-document"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"affiliationDocumentUrl\": \"https://docs.test/afiliacion-renovada.pdf\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Transferir administración a un miembro activo",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/admin?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "admin"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newAdminPlayerId\": {{playerId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Club - Admin general",
+      "item": [
+        {
+          "name": "Clubes pendientes (admin general) [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/pending?actingPlayerId={{systemAdminId}}&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "pending"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{systemAdminId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aprobar club (admin general)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/{{clubId}}/approve?actingPlayerId={{systemAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "{{clubId}}",
+                "approve"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{systemAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rechazar club con motivo (admin general)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/{{clubId}}/reject?actingPlayerId={{systemAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "{{clubId}}",
+                "reject"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{systemAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionReason\": \"El documento no corresponde a la federación\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial de revisiones (admin general) [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/{{clubId}}/reviews?actingPlayerId={{systemAdminId}}&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "{{clubId}}",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{systemAdminId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "ClubMembership",
+      "item": [
+        {
+          "name": "Solicitar ingreso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships?actingPlayerId={{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{playerId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clubId\": {{clubId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('membershipId', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Solicitudes pendientes del club (admin del club) [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/clubs/{{clubId}}/pending?actingPlayerId={{clubAdminId}}&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "clubs",
+                "{{clubId}}",
+                "pending"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aprobar solicitud (admin del club)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/approve?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "approve"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rechazar solicitud (admin del club)",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/reject?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "reject"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar mi solicitud pendiente",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/cancel?actingPlayerId={{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "cancel"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{playerId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Abandonar el club",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/leave?actingPlayerId={{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "leave"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{playerId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Miembros activos del club [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/clubs/{{clubId}}/members?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "clubs",
+                "{{clubId}}",
+                "members"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Historial de membresías de un jugador [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/players/{{playerId}}?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "players",
+                "{{playerId}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tournament",
+      "item": [
+        {
+          "name": "Crear torneo (admin del club)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clubId\": {{clubId}},\n  \"name\": \"Apertura 2026\",\n  \"type\": \"INTERNAL\",\n  \"matchFormat\": \"BO3\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });",
+                  "if (pm.response.code === 201) { pm.collectionVariables.set('tournamentId', pm.response.json().id); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle del torneo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Torneos de un club [paginado]",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/clubs/{{clubId}}?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "clubs",
+                "{{clubId}}"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Respuesta paginada: {content, page, size, totalElements, totalPages, first, last}. page empieza en 0; size por defecto 10, máximo 50."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+                  "pm.test('Respuesta paginada', function () {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.content).to.be.an('array');",
+                  "  pm.expect(body.size).to.be.at.most(50);",
+                  "  pm.expect(body).to.have.property('totalElements');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Inscribir participante (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/participants?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "participants"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": {{playerId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 201', function () { pm.response.to.have.status(201); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Participantes y siembra",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/participants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "participants"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Retirar participante (admin, antes de iniciar)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/participants/{{playerId}}?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "participants",
+                "{{playerId}}"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 204', function () { pm.response.to.have.status(204); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ajustar siembra manual (lista completa, seed 1 primero)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/seeding?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "seeding"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderedPlayerIds\": [\n    1,\n    2,\n    3,\n    4\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar torneo (genera grupos y partidos)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/start?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "start"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Partidos del torneo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/matches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "matches"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Clasificación de grupos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "groups"
+              ],
+              "query": []
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Resolver empate manualmente (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/groups/1/tie-resolution?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "groups",
+                "1",
+                "tie-resolution"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderedPlayerIds\": [\n    3,\n    1,\n    2\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Declarar W.O. (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/matches/{{tournamentMatchId}}/walkover?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "matches",
+                "{{tournamentMatchId}}",
+                "walkover"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "Gana el jugador presente, sin sets ni puntos inventados. 400 si el ausente no juega el partido; 409 si ya hay un marcador reportado en Match o el partido no está SCHEDULED.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"absentPlayerId\": {{playerId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sincronizar resultados de Match (admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/sync-results?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "sync-results"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": "Lee con MatchService.getMatchById los partidos CONFIRMED y actualiza grupos y llave. Normalmente no hace falta: la llave avanza sola con MatchConfirmedEvent. 409 si el Match lo jugaron otros jugadores."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Sincronizar resultados confirmados de Match",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/sync-results?actingPlayerId={{clubAdminId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "sync-results"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Generar llave eliminatoria",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/knockout?actingPlayerId={{clubAdminId}}&allowSameGroupMatches=false",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "knockout"
+              ],
+              "query": [
+                {
+                  "key": "actingPlayerId",
+                  "value": "{{clubAdminId}}"
+                },
+                {
+                  "key": "allowSameGroupMatches",
+                  "value": "false"
+                }
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
