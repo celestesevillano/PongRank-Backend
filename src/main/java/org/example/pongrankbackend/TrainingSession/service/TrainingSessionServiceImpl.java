@@ -8,6 +8,8 @@ import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDT
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -61,5 +63,29 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
         return sessions.stream()
                 .map(session -> modelMapper.map(session, TrainingSessionResponseDTO.class))
                 .toList();
+    }
+
+    @Override
+    public Page<TrainingSessionResponseDTO> getHistoryByPlayer(Long playerId, Pageable pageable) {
+        if (!playerRepository.existsById(playerId)) {
+            throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
+        }
+
+        return trainingSessionRepository.findByPlayerIdOrderByCreatedAtDesc(playerId, pageable)
+                .map(session -> modelMapper.map(session, TrainingSessionResponseDTO.class));
+    }
+
+    @Override
+    public TrainingSessionResponseDTO getBestSessionByPlayer(Long playerId) {
+        if (!playerRepository.existsById(playerId)) {
+            throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
+        }
+
+        TrainingSession bestSession = trainingSessionRepository.findTopByPlayerIdOrderByPostureScoreDesc(playerId)
+                .orElseThrow(() -> new ResourceNotFoundException("No se encontraron sesiones de entrenamiento para el jugador con ID: " + playerId));
+
+        TrainingSessionResponseDTO response = modelMapper.map(bestSession, TrainingSessionResponseDTO.class);
+        response.setNewPersonalBest(true);
+        return response;
     }
 }
