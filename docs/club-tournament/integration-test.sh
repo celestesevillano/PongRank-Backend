@@ -3,8 +3,8 @@
 # PongRank - Integration test for Club, ClubMembership and Tournament (HTTP + PostgreSQL)
 #
 # Runs against an ISOLATED database (default: pongrank_it) so your real data is never touched.
-# Match results are SIMULATED with SQL because the Match module has no service/endpoints yet:
-# this validates Tournament + the provisional Match adapter, NOT Adriana's real Match logic.
+# Match results go through the REAL Match module endpoints (submit + confirm, ITTF validation) and the
+# bracket must advance automatically through MatchConfirmedEvent. Any unexpected HTTP 500 fails the run.
 #
 # Usage (from the project root, with the app already running against the isolated DB):
 #   ./docs/club-tournament/integration-test.sh [BASE_URL] [DB_CONTAINER] [DB_NAME]
@@ -36,14 +36,10 @@ request() {
   BODY="${response%$'\n'*}"
 }
 
-# check DESCRIPTION EXPECTED  (EXPECTED: exact code like 201, or "error" for any 4xx/5xx)
+# check DESCRIPTION EXPECTED_HTTP_CODE  (exact code only: a 500 is never accepted)
 check() {
   local description="$1" expected="$2" ok=0
-  if [ "$expected" = "error" ]; then
-    [ "$STATUS" -ge 400 ] && ok=1
-  else
-    [ "$STATUS" = "$expected" ] && ok=1
-  fi
+  [ "$STATUS" = "$expected" ] && [ "$STATUS" != "500" ] && ok=1
   if [ $ok -eq 1 ]; then
     PASS=$((PASS + 1)); echo "  PASS [$STATUS] $description"
   else
@@ -65,9 +61,20 @@ register() {
   echo "$BODY" | json "d['id']"
 }
 
-confirm_match() { # confirm_match MATCH_ID  -> player1 wins 3-0 (simulates the Match module)
-  sql "UPDATE matches SET status='CONFIRMED', confirmed_at=now() WHERE id=$1;
-       INSERT INTO match_sets (match_id, set_number, score_player1, score_player2) VALUES ($1,1,11,5),($1,2,11,7),($1,3,12,10);"
+play_match() { # play_match MATCH_ID PLAYER1_ID PLAYER2_ID -> player1 wins 2-0 (BO3) through the Match module
+  request POST "/api/v1/matches/$1/submit?submittingPlayerId=$2" '{"sets":[{"setNumber":1,"scorePlayer1":11,"scorePlayer2":5},{"setNumber":2,"scorePlayer1":12,"scorePlayer2":10}]}'
+  check "Match $1: player1 submits score" 200
+  request PUT "/api/v1/matches/$1/confirm?actingPlayerId=$3"
+  check "Match $1: player2 confirms" 200
+}
+
+play_scheduled() { # play every SCHEDULED match of the given stage in tournament $T
+  local stage="$1" rows
+  rows=$(curl -s "$BASE_URL/api/v1/tournaments/$T/matches" | json "' '.join(f\"{m['matchId']},{m['player1']['id']},{m['player2']['id']}\" for m in d if m['status']=='SCHEDULED' and m['stage']=='$stage')")
+  for row in $rows; do
+    IFS=, read -r MID P1 P2 <<< "$row"
+    play_match "$MID" "$P1" "$P2"
+  done
 }
 
 echo "== PongRank integration test (run $RUN_ID) against $BASE_URL, database $DB_NAME"
@@ -82,13 +89,19 @@ sql "UPDATE players SET rating_glicko=1900 WHERE id=$B; UPDATE players SET ratin
 echo "  players: SA=$SA A=$A B=$B C=$C D=$D E=$E F=$F G=$G H=$H"
 
 echo "== 2. Club verification"
+request GET "/api/v1/clubs/999999999"
+check "unknown club -> 404" 404
+request GET "/api/v1/tournaments/999999999"
+check "unknown tournament -> 404" 404
+request POST "/api/v1/tournaments?actingPlayerId=$A" '{"clubId":1,"name":"Fechas","type":"OPEN","matchFormat":"BO3","startDate":"2026-10-10T10:00:00","endDate":"2026-10-01T10:00:00"}'
+check "end date before start date -> 400" 400
 request POST "/api/v1/clubs?actingPlayerId=$A" "{\"name\":\"Club IT $RUN_ID\",\"address\":\"Av. Test 1\",\"affiliationDocumentUrl\":\"https://docs.test/$RUN_ID-1.pdf\"}"
 check "register club -> PENDING" 201; CLUB=$(echo "$BODY" | json "d['id']")
 assert_eq "new club status" "PENDING" "$(echo "$BODY" | json "d['status']")"
 request POST "/api/v1/clubs?actingPlayerId=$A" "{\"name\":\"club it $RUN_ID\",\"address\":\"x\",\"affiliationDocumentUrl\":\"https://docs.test/x.pdf\"}"
-check "same admin cannot register a second club / duplicate name" error
+check "same admin cannot register a second club / duplicate name" 409
 request PATCH "/api/v1/admin/clubs/$CLUB/approve?actingPlayerId=$B"
-check "non system admin cannot approve" error
+check "non system admin cannot approve -> 403" 403
 request PATCH "/api/v1/admin/clubs/$CLUB/reject?actingPlayerId=$SA" '{"rejectionReason":""}'
 check "reject without reason -> 400" 400
 request PATCH "/api/v1/admin/clubs/$CLUB/reject?actingPlayerId=$SA" '{"rejectionReason":"Documento vencido"}'
@@ -100,12 +113,12 @@ request GET "/api/v1/clubs/$CLUB/review?actingPlayerId=$A"
 check "club admin reads private review" 200
 assert_eq "private review shows reason" "Documento vencido" "$(echo "$BODY" | json "d['rejectionReason']")"
 request GET "/api/v1/clubs/$CLUB/review?actingPlayerId=$B"
-check "other player cannot read private review" error
+check "other player cannot read private review -> 403" 403
 request PATCH "/api/v1/clubs/$CLUB/resubmit?actingPlayerId=$A" "{\"affiliationDocumentUrl\":\"https://docs.test/$RUN_ID-2.pdf\"}"
 check "resubmit rejected club -> PENDING" 200
 assert_eq "resubmit keeps the same club id" "$CLUB" "$(echo "$BODY" | json "d['id']")"
 request POST "/api/v1/tournaments?actingPlayerId=$A" "{\"clubId\":$CLUB,\"name\":\"T0\",\"type\":\"INTERNAL\",\"matchFormat\":\"BO3\"}"
-check "PENDING club cannot create tournaments" error
+check "PENDING club cannot create tournaments -> 409" 409
 request PATCH "/api/v1/admin/clubs/$CLUB/approve?actingPlayerId=$SA"
 check "system admin approves" 200
 request GET "/api/v1/admin/clubs/$CLUB/reviews?actingPlayerId=$SA"
@@ -121,68 +134,68 @@ for P in $B $C $D $E $F; do
   MID=$(echo "$BODY" | json "d['id']")
   if [ "$P" = "$B" ]; then
     request POST "/api/v1/club-memberships?actingPlayerId=$P" "{\"clubId\":$CLUB}"
-    check "duplicate request rejected" error
+    check "duplicate request rejected -> 409" 409
     request PATCH "/api/v1/club-memberships/$MID/approve?actingPlayerId=$B"
-    check "only the club admin approves" error
+    check "only the club admin approves -> 403" 403
   fi
   request PATCH "/api/v1/club-memberships/$MID/approve?actingPlayerId=$A"
   check "club admin approves $P" 200
-  [ "$P" = "$B" ] && { request PATCH "/api/v1/club-memberships/$MID/approve?actingPlayerId=$A"; check "approving twice fails" error; request PATCH "/api/v1/club-memberships/$MID/cancel?actingPlayerId=$B"; check "cannot cancel an approved membership" error; }
+  [ "$P" = "$B" ] && { request PATCH "/api/v1/club-memberships/$MID/approve?actingPlayerId=$A"; check "approving twice fails -> 409" 409; request PATCH "/api/v1/club-memberships/$MID/cancel?actingPlayerId=$B"; check "cannot cancel an approved membership -> 409" 409; }
 done
 request POST "/api/v1/club-memberships?actingPlayerId=$G" "{\"clubId\":$CLUB}"
 GMID=$(echo "$BODY" | json "d['id']")
 request PATCH "/api/v1/club-memberships/$GMID/cancel?actingPlayerId=$G"
 check "player cancels own pending request" 200
 request PATCH "/api/v1/club-memberships/$GMID/reject?actingPlayerId=$A"
-check "cannot reject an already cancelled request" error
+check "cannot reject an already cancelled request -> 409" 409
 ADMIN_MID=$(sql "SELECT id FROM club_memberships WHERE player_id=$A AND club_id=$CLUB AND status='APPROVED';")
 request PATCH "/api/v1/club-memberships/$ADMIN_MID/leave?actingPlayerId=$A"
-check "club admin cannot leave while responsible" error
+check "club admin cannot leave while responsible -> 409" 409
 request POST "/api/v1/clubs?actingPlayerId=$G" "{\"name\":\"Club IT2 $RUN_ID\",\"address\":\"Av. Test 2\",\"affiliationDocumentUrl\":\"https://docs.test/$RUN_ID-3.pdf\"}"
 CLUB2=$(echo "$BODY" | json "d['id']")
 request POST "/api/v1/club-memberships?actingPlayerId=$B" "{\"clubId\":$CLUB2}"
-check "request to a non approved club fails" error
+check "request to a non approved club fails -> 409" 409
 
 echo "== 4. Tournament (INTERNAL, 6 members -> 2 groups of 3)"
 request POST "/api/v1/tournaments?actingPlayerId=$B" "{\"clubId\":$CLUB,\"name\":\"Apertura $RUN_ID\",\"type\":\"INTERNAL\",\"matchFormat\":\"BO3\"}"
-check "non admin cannot create tournament" error
+check "non admin cannot create tournament -> 403" 403
 request POST "/api/v1/tournaments?actingPlayerId=$A" "{\"clubId\":$CLUB,\"name\":\"Apertura $RUN_ID\",\"type\":\"INTERNAL\",\"matchFormat\":\"BO3\"}"
 check "club admin creates INTERNAL tournament" 201; T=$(echo "$BODY" | json "d['id']")
 request POST "/api/v1/tournaments/$T/participants?actingPlayerId=$A" "{\"playerId\":$H}"
-check "non member cannot join INTERNAL tournament" error
+check "non member cannot join INTERNAL tournament -> 409" 409
 for P in $A $B $C $D $E $F; do
   request POST "/api/v1/tournaments/$T/participants?actingPlayerId=$A" "{\"playerId\":$P}"
   check "add participant $P" 201
 done
 request POST "/api/v1/tournaments/$T/participants?actingPlayerId=$A" "{\"playerId\":$B}"
-check "duplicate participant rejected" error
+check "duplicate participant rejected -> 409" 409
 request GET "/api/v1/tournaments/$T/participants"
 assert_eq "default seeding by Glicko: B (1900) is seed 1" "$B" "$(echo "$BODY" | json "d[0]['player']['id']")"
 request POST "/api/v1/tournaments/$T/start?actingPlayerId=$B"
-check "non admin cannot start" error
+check "non admin cannot start -> 403" 403
 request POST "/api/v1/tournaments/$T/start?actingPlayerId=$A"
 check "start tournament -> GROUP_STAGE" 200
 request POST "/api/v1/tournaments/$T/participants?actingPlayerId=$A" "{\"playerId\":$G}"
-check "participant list closed after start" error
+check "participant list closed after start -> 409" 409
 request GET "/api/v1/tournaments/$T/matches"
 assert_eq "6 round robin matches (2 groups of 3)" "6" "$(echo "$BODY" | json "len(d)")"
 
-echo "== 5. Group results (1 W.O. via API, the rest simulated as confirmed Match rows)"
+echo "== 5. Group results (1 W.O. via API, the rest played through the Match module)"
 WO_TM=$(echo "$BODY" | json "d[0]['id']"); WO_ABSENT=$(echo "$BODY" | json "d[0]['player2']['id']")
+request POST "/api/v1/tournaments/$T/matches/$WO_TM/walkover?actingPlayerId=$A" "{\"absentPlayerId\":$H}"
+check "W.O. with a player outside the match -> 400" 400
 request POST "/api/v1/tournaments/$T/matches/$WO_TM/walkover?actingPlayerId=$A" "{\"absentPlayerId\":$WO_ABSENT}"
 check "declare W.O." 200
 assert_eq "W.O. has no invented sets" "None" "$(echo "$BODY" | json "d.get('setsPlayer1')")"
-for MID in $(echo "$BODY" >/dev/null; curl -s "$BASE_URL/api/v1/tournaments/$T/matches" | json "' '.join(str(m['matchId']) for m in d if m['status']=='SCHEDULED')"); do
-  confirm_match "$MID"
-done
 request POST "/api/v1/tournaments/$T/knockout?actingPlayerId=$A"
-check "knockout blocked until results are synchronized" error
-request POST "/api/v1/tournaments/$T/sync-results?actingPlayerId=$A"
-check "sync confirmed results" 200
+check "knockout blocked while group matches are pending -> 409" 409
+play_scheduled GROUP
 request GET "/api/v1/tournaments/$T/groups"
 check "group standings" 200
-assert_eq "both groups completed" "True" "$(echo "$BODY" | json "all(g['completed'] for g in d)")"
+assert_eq "groups completed automatically after Match confirmations (no sync)" "True" "$(echo "$BODY" | json "all(g['completed'] for g in d)")"
 assert_eq "2 qualifiers per group" "4" "$(echo "$BODY" | json "sum(1 for g in d for r in g['standings'] if r['qualified'])")"
+request POST "/api/v1/tournaments/$T/sync-results?actingPlayerId=$A"
+check "manual sync is still available (no-op)" 200
 
 echo "== 6. Knockout"
 request POST "/api/v1/tournaments/$T/knockout?actingPlayerId=$A"
@@ -190,17 +203,12 @@ check "generate knockout" 200
 assert_eq "status KNOCKOUT_STAGE" "KNOCKOUT_STAGE" "$(echo "$BODY" | json "d['status']")"
 request GET "/api/v1/tournaments/$T/matches"
 assert_eq "2 semifinals scheduled" "2" "$(echo "$BODY" | json "sum(1 for m in d if m['stage']=='KNOCKOUT' and m['round']==1 and m['status']=='SCHEDULED')")"
-SEMIS=$(echo "$BODY" | json "' '.join(str(m['matchId']) for m in d if m['stage']=='KNOCKOUT' and m['round']==1)")
-for MID in $SEMIS; do confirm_match "$MID"; done
-request POST "/api/v1/tournaments/$T/sync-results?actingPlayerId=$A"
-check "sync semifinals" 200
+play_scheduled KNOCKOUT
 request GET "/api/v1/tournaments/$T/matches"
-assert_eq "final scheduled with both winners" "SCHEDULED" "$(echo "$BODY" | json "[m['status'] for m in d if m['stage']=='KNOCKOUT' and m['round']==2][0]")"
-FINAL=$(echo "$BODY" | json "[m['matchId'] for m in d if m['stage']=='KNOCKOUT' and m['round']==2][0]")
-confirm_match "$FINAL"
-request POST "/api/v1/tournaments/$T/sync-results?actingPlayerId=$A"
-check "sync final" 200
-assert_eq "tournament FINISHED" "FINISHED" "$(echo "$BODY" | json "d['status']")"
+assert_eq "final scheduled automatically with both winners" "SCHEDULED" "$(echo "$BODY" | json "[m['status'] for m in d if m['stage']=='KNOCKOUT' and m['round']==2][0]")"
+play_scheduled KNOCKOUT
+request GET "/api/v1/tournaments/$T"
+assert_eq "tournament FINISHED automatically" "FINISHED" "$(echo "$BODY" | json "d['status']")"
 assert_eq "tournament has a champion" "True" "$(echo "$BODY" | json "d['winner'] is not None")"
 
 echo "== 7. Pagination"
@@ -223,13 +231,13 @@ request GET "/api/v1/admin/clubs/pending?actingPlayerId=$SA&page=0&size=50"
 check "pending clubs paginated (system admin)" 200
 assert_eq "pending page has results and only PENDING clubs" "True" "$(echo "$BODY" | json "d['totalElements'] >= 1 and all(c['status']=='PENDING' for c in d['content'])")"
 request GET "/api/v1/admin/clubs/pending?actingPlayerId=$B&page=0&size=5"
-check "pending clubs still require the system admin" error
+check "pending clubs still require the system admin -> 403" 403
 request GET "/api/v1/club-memberships/clubs/$CLUB/pending?actingPlayerId=$A&page=0&size=5"
 check "pending requests paginated (club admin)" 200
 
 echo "== 8. Transfer and leave"
 request PATCH "/api/v1/clubs/$CLUB/admin?actingPlayerId=$A" "{\"newAdminPlayerId\":$H}"
-check "cannot transfer to a non member" error
+check "cannot transfer to a non member -> 409" 409
 request PATCH "/api/v1/clubs/$CLUB/admin?actingPlayerId=$A" "{\"newAdminPlayerId\":$B}"
 check "transfer administration to member B" 200
 request PATCH "/api/v1/club-memberships/$ADMIN_MID/leave?actingPlayerId=$A"

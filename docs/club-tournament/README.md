@@ -3,8 +3,11 @@
 Responsable: Emiliano (integrante 4). Rama: `feature/club-tournament-emiliano`.
 
 > `actingPlayerId` es PROVISIONAL: lo envía el cliente y **no es autenticación**. Debe reemplazarse por la
-> identidad del JWT (buscar `TODO: Replace actingPlayerId`). Mientras no se integren las excepciones de
-> Celeste, los conflictos de negocio responden **500** (los errores de validación ya responden 400).
+> identidad del JWT (buscar `TODO: Replace actingPlayerId`).
+
+Errores (excepciones compartidas de `common.exception`): recurso inexistente **404**
+(`ResourceNotFoundException`), conflicto de negocio **409** (`ConflictException`), actor sin permiso **403**
+(`UnauthorizedActionException`), validación **400**. Un 500 indica un defecto.
 
 ## 1. Pruebas unitarias (sin base de datos)
 
@@ -29,9 +32,8 @@ SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5435/pongrank_it PORT=8081 ./m
 ./docs/club-tournament/integration-test.sh http://localhost:8081
 ```
 Esperado al final: `RESULT: N passed, 0 failed`.
-El puerto 5435 viene de tu `docker-compose.override.yml`. Los resultados de partidos se **simulan con SQL**
-en la base aislada porque el módulo Match aún no tiene servicio: esto valida Tournament y el adaptador
-provisional, **no** la lógica real de Match.
+El puerto 5435 viene de tu `docker-compose.override.yml`. Los partidos se juegan con los endpoints reales del
+módulo Match (`submit` + `confirm`) y la llave avanza sola gracias a `MatchConfirmedEvent`.
 
 ## 3. Postman
 Importar `PongRank-Club-Tournament.postman_collection.json` y ajustar las variables
@@ -95,3 +97,13 @@ participantes, partidos y clasificación de grupos de un torneo.
 ## 6. Datos antiguos
 `backfill-club-admin-memberships.sql` crea la membresía CLUB_ADMIN que falta en clubes aprobados antes de esta
 funcionalidad. Es idempotente, solo inserta y **no se ha ejecutado**: requiere autorización.
+
+## 7. Integración con Match (Adriana)
+
+| Necesidad de Tournament | Estado |
+|---|---|
+| Registrar y validar marcadores (sets a 11, deuce, BO3/BO5/BO7) | Integrado: los jugadores usan `POST /api/v1/matches/{id}/submit` y `PUT /api/v1/matches/{id}/confirm` |
+| Ganador, sets y estado del partido | Integrado: `MatchService.getMatchById` (`winnerId`, `sets`) |
+| Avance automático de la llave | Integrado: `TournamentMatchEventListener` escucha `MatchConfirmedEvent` |
+| Crear el partido de un torneo | **Provisional**: `MatchService.createMatch` solo acepta FRIEND/COMMUNITY/LOCATION (FRIEND exige amistad). Se guarda con `MatchRepository`. Contrato pedido: `MatchType.TOURNAMENT` o `createTournamentMatch(player1, player2, format)` |
+| Anular el `Match` de un W.O. | Pendiente: `cancelMatch` exige que actúe un jugador participante; el W.O. lo declara el admin del torneo |

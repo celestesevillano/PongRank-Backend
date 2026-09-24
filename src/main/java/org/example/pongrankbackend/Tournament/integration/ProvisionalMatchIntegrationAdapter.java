@@ -1,27 +1,37 @@
 package org.example.pongrankbackend.Tournament.integration;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.Match.MatchFormat;
 import org.example.pongrankbackend.Match.MatchStatus;
-import org.example.pongrankbackend.MatchSet.MatchSet;
+import org.example.pongrankbackend.Match.dto.MatchDetailResponseDTO;
+import org.example.pongrankbackend.Match.repository.MatchRepository;
+import org.example.pongrankbackend.Match.service.MatchService;
+import org.example.pongrankbackend.MatchSet.dto.MatchSetResponseDTO;
 import org.example.pongrankbackend.Player.Player;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
 
 /*
- * PROVISIONAL adapter until the Match module exposes a service (pending with Adriana).
- * It only uses the existing Match / MatchSet entities: it creates Match rows in CREATED status and reads
- * matches that the Match module already marked as CONFIRMED. It does NOT validate or compute scores:
- * it only adds up the sets and points already stored. Replace it with a call to MatchService when available.
+ * Adapter between Tournament and the Match module (owner: Adriana).
+ *
+ * RESULTS (integrated): the winner, the sets and the CONFIRMED status come from MatchService.getMatchById.
+ * Score validation (sets to 11, deuce, BO3/BO5/BO7) happens in Match when players use its submit/confirm endpoints.
+ *
+ * CREATION (PROVISIONAL): MatchService.createMatch only accepts FRIEND, COMMUNITY or LOCATION matches
+ * (FRIEND requires a friendship), so tournament matches cannot be created through it yet. Until the Match
+ * module offers a tournament contract (e.g. MatchType.TOURNAMENT), the Match row is saved with its repository.
  */
 @Component
 public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort {
 
-    @PersistenceContext
-    private EntityManager entityManager;
+    private final MatchRepository matchRepository;
+    private final MatchService matchService;
+
+    public ProvisionalMatchIntegrationAdapter(MatchRepository matchRepository, MatchService matchService) {
+        this.matchRepository = matchRepository;
+        this.matchService = matchService;
+    }
 
     @Override
     public Match createMatch(Player player1, Player player2, MatchFormat format) {
@@ -31,13 +41,17 @@ public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort 
                 .format(format)
                 .status(MatchStatus.CREATED)
                 .build();
-        entityManager.persist(match);
-        return match;
+        return matchRepository.save(match);
     }
 
     @Override
     public Optional<MatchOutcome> findConfirmedOutcome(Match match) {
-        if (match == null || match.getStatus() != MatchStatus.CONFIRMED || match.getSets().isEmpty()) {
+        if (match == null || match.getId() == null) {
+            return Optional.empty();
+        }
+
+        MatchDetailResponseDTO detail = matchService.getMatchById(match.getId());
+        if (detail.getStatus() != MatchStatus.CONFIRMED || detail.getWinnerId() == null) {
             return Optional.empty();
         }
 
@@ -45,20 +59,15 @@ public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort 
         int setsPlayer2 = 0;
         int pointsPlayer1 = 0;
         int pointsPlayer2 = 0;
-        for (MatchSet set : match.getSets()) {
+        for (MatchSetResponseDTO set : detail.getSets()) {
             pointsPlayer1 += set.getScorePlayer1();
             pointsPlayer2 += set.getScorePlayer2();
-            if (set.getScorePlayer1() > set.getScorePlayer2()) {
+            if (Integer.valueOf(1).equals(set.getWinnerPlayerNumber())) {
                 setsPlayer1++;
-            } else if (set.getScorePlayer2() > set.getScorePlayer1()) {
+            } else {
                 setsPlayer2++;
             }
         }
-
-        if (setsPlayer1 == setsPlayer2) {
-            return Optional.empty();
-        }
-        Long winnerId = setsPlayer1 > setsPlayer2 ? match.getPlayer1().getId() : match.getPlayer2().getId();
-        return Optional.of(new MatchOutcome(winnerId, setsPlayer1, setsPlayer2, pointsPlayer1, pointsPlayer2));
+        return Optional.of(new MatchOutcome(detail.getWinnerId(), setsPlayer1, setsPlayer2, pointsPlayer1, pointsPlayer2));
     }
 }

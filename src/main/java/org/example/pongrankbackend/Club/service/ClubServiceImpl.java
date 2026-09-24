@@ -20,12 +20,14 @@ import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.NoSuchElementException;
 
 @Service
 @Transactional(readOnly = true)
@@ -113,8 +115,7 @@ public class ClubServiceImpl implements ClubService {
         Club club = findClubById(clubId);
 
         if (!isClubAdmin(club, actingPlayerId) && !isSystemAdmin(findPlayerById(actingPlayerId))) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el administrador del club o el administrador general pueden ver la revisión");
+            throw new UnauthorizedActionException("Solo el administrador del club o el administrador general pueden ver la revisión");
         }
 
         return modelMapper.map(club, ClubReviewResponseDTO.class);
@@ -140,8 +141,7 @@ public class ClubServiceImpl implements ClubService {
         validateClubAdmin(club, actingPlayerId);
 
         if (club.getStatus() == ClubStatus.REJECTED) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Un club rechazado debe reemplazar su documento al reenviarse a revisión");
+            throw new ConflictException("Un club rechazado debe reemplazar su documento al reenviarse a revisión");
         }
 
         return sendToReview(club, dto.getAffiliationDocumentUrl());
@@ -156,13 +156,11 @@ public class ClubServiceImpl implements ClubService {
         validateClubStatus(club, ClubStatus.APPROVED, "Solo un club aprobado puede transferir su administración");
 
         if (actingPlayerId.equals(dto.getNewAdminPlayerId())) {
-            // TODO: Replace with custom BadRequestException
-            throw new IllegalArgumentException("El nuevo administrador debe ser un jugador distinto al actual");
+            throw new ConflictException("El nuevo administrador debe ser un jugador distinto al actual");
         }
 
         if (clubRepository.existsByAdminIdAndStatusInAndIdNot(dto.getNewAdminPlayerId(), ClubStatus.ACTIVE_STATUSES, clubId)) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El nuevo administrador ya administra otro club en revisión o aprobado");
+            throw new ConflictException("El nuevo administrador ya administra otro club en revisión o aprobado");
         }
 
         Player newAdmin = clubMembershipService.transferAdminRole(club, dto.getNewAdminPlayerId());
@@ -258,8 +256,7 @@ public class ClubServiceImpl implements ClubService {
     // currentClubId excludes the club being resubmitted or approved; null when registering a new club.
     private void validateCanAdministerClub(Long playerId, Long currentClubId) {
         if (clubMembershipService.hasActiveMembershipOutsideClub(playerId, currentClubId)) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El jugador ya pertenece a otro club o tiene una solicitud de ingreso pendiente");
+            throw new ConflictException("El jugador ya pertenece a otro club o tiene una solicitud de ingreso pendiente");
         }
 
         boolean administersAnotherClub = currentClubId == null
@@ -267,32 +264,27 @@ public class ClubServiceImpl implements ClubService {
                 : clubRepository.existsByAdminIdAndStatusInAndIdNot(playerId, ClubStatus.ACTIVE_STATUSES, currentClubId);
 
         if (administersAnotherClub) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El jugador ya administra otro club en revisión o aprobado");
+            throw new ConflictException("El jugador ya administra otro club en revisión o aprobado");
         }
     }
 
     private Player findPlayerById(Long playerId) {
         return playerRepository.findById(playerId)
-                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + playerId)); // TODO: Replace with custom ResourceNotFoundException
-    }
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));    }
 
     private Club findClubById(Long clubId) {
         return clubRepository.findById(clubId)
-                .orElseThrow(() -> new NoSuchElementException("Club no encontrado con ID: " + clubId)); // TODO: Replace with custom ResourceNotFoundException
-    }
+                .orElseThrow(() -> new ResourceNotFoundException("Club no encontrado con ID: " + clubId));    }
 
     private void validateClubStatus(Club club, ClubStatus expectedStatus, String message) {
         if (club.getStatus() != expectedStatus) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException(message);
+            throw new ConflictException(message);
         }
     }
 
     private void validateNameIsAvailable(String normalizedName) {
         if (clubRepository.existsByNameIgnoreCase(normalizedName)) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Ya existe un club registrado con el nombre '" + normalizedName + "'");
+            throw new ConflictException("Ya existe un club registrado con el nombre '" + normalizedName + "'");
         }
     }
 
@@ -302,8 +294,7 @@ public class ClubServiceImpl implements ClubService {
 
     private void validateClubAdmin(Club club, Long actingPlayerId) {
         if (!isClubAdmin(club, actingPlayerId)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el administrador del club puede realizar esta acción");
+            throw new UnauthorizedActionException("Solo el administrador del club puede realizar esta acción");
         }
     }
 
@@ -316,8 +307,7 @@ public class ClubServiceImpl implements ClubService {
         Player actingPlayer = findPlayerById(actingPlayerId);
 
         if (!isSystemAdmin(actingPlayer)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el administrador general de PongRank puede revisar clubes");
+            throw new UnauthorizedActionException("Solo el administrador general de PongRank puede revisar clubes");
         }
 
         return actingPlayer;

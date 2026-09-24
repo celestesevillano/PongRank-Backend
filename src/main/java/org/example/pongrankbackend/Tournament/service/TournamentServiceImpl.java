@@ -40,9 +40,14 @@ import org.example.pongrankbackend.Tournament.repository.TournamentParticipantRe
 import org.example.pongrankbackend.Tournament.repository.TournamentRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.InvalidMatchStateException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
@@ -101,18 +106,11 @@ public class TournamentServiceImpl implements TournamentService {
     @Transactional
     public TournamentResponseDTO createTournament(Long actingPlayerId, TournamentCreateRequestDTO dto) {
         Club club = clubRepository.findById(dto.getClubId())
-                .orElseThrow(() -> new NoSuchElementException("Club no encontrado con ID: " + dto.getClubId())); // TODO: Replace with custom ResourceNotFoundException
-
+                .orElseThrow(() -> new ResourceNotFoundException("Club no encontrado con ID: " + dto.getClubId()));
         validateClubAdmin(club, actingPlayerId);
 
         if (!club.canOrganizeTournaments()) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Solo un club APPROVED puede organizar torneos");
-        }
-
-        if (dto.getStartDate() != null && dto.getEndDate() != null && dto.getEndDate().isBefore(dto.getStartDate())) {
-            // TODO: Replace with custom BadRequestException
-            throw new IllegalArgumentException("La fecha de fin no puede ser anterior a la fecha de inicio");
+            throw new ConflictException("Solo un club APPROVED puede organizar torneos");
         }
 
         Tournament tournament = Tournament.builder()
@@ -136,8 +134,7 @@ public class TournamentServiceImpl implements TournamentService {
     @Override
     public PageResponseDTO<TournamentResponseDTO> getClubTournaments(Long clubId, int page, int size) {
         if (!clubRepository.existsById(clubId)) {
-            // TODO: Replace with custom ResourceNotFoundException
-            throw new NoSuchElementException("Club no encontrado con ID: " + clubId);
+            throw new ResourceNotFoundException("Club no encontrado con ID: " + clubId);
         }
         return PageResponseDTO.from(
                 tournamentRepository.findByClubId(clubId, PageRequestFactory.of(page, size, Sort.by("createdAt").descending())),
@@ -163,17 +160,14 @@ public class TournamentServiceImpl implements TournamentService {
         validateStatus(tournament, TournamentStatus.OPEN, "Las inscripciones del torneo ya están cerradas");
 
         Player player = playerRepository.findById(dto.getPlayerId())
-                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + dto.getPlayerId())); // TODO: Replace with custom ResourceNotFoundException
-
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + dto.getPlayerId()));
         String eligibilityError = eligibilityError(tournament, player);
         if (eligibilityError != null) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException(eligibilityError);
+            throw new ConflictException(eligibilityError);
         }
 
         if (participantRepository.existsByTournamentIdAndPlayerId(tournamentId, player.getId())) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El jugador ya está inscrito en el torneo");
+            throw new ConflictException("El jugador ya está inscrito en el torneo");
         }
 
         List<TournamentParticipant> participants = new ArrayList<>(participantRepository.findByTournamentIdOrderBySeedAsc(tournamentId));
@@ -200,8 +194,7 @@ public class TournamentServiceImpl implements TournamentService {
         validateStatus(tournament, TournamentStatus.OPEN, "La lista de participantes queda cerrada una vez iniciado el torneo");
 
         TournamentParticipant participant = participantRepository.findByTournamentIdAndPlayerId(tournamentId, playerId)
-                .orElseThrow(() -> new NoSuchElementException("El jugador no está inscrito en el torneo")); // TODO: Replace with custom ResourceNotFoundException
-
+                .orElseThrow(() -> new ResourceNotFoundException("El jugador no está inscrito en el torneo"));
         participantRepository.delete(participant);
 
         List<TournamentParticipant> remaining = participantRepository.findByTournamentIdOrderBySeedAsc(tournamentId).stream()
@@ -229,8 +222,7 @@ public class TournamentServiceImpl implements TournamentService {
         List<Long> ordered = dto.getOrderedPlayerIds();
 
         if (ordered.size() != participants.size() || !new HashSet<>(ordered).equals(byPlayer.keySet())) {
-            // TODO: Replace with custom BadRequestException
-            throw new IllegalArgumentException("La siembra debe incluir a todos los participantes exactamente una vez");
+            throw new ConflictException("La siembra debe incluir a todos los participantes exactamente una vez");
         }
 
         for (int i = 0; i < ordered.size(); i++) {
@@ -257,8 +249,7 @@ public class TournamentServiceImpl implements TournamentService {
 
         List<TournamentParticipant> participants = participantRepository.findByTournamentIdOrderBySeedAsc(tournamentId);
         if (!groupDistributor.canDistribute(participants.size())) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Se necesitan al menos 3 participantes y una cantidad que permita formar grupos de 3 o 4 jugadores (con "
+            throw new ConflictException("Se necesitan al menos 3 participantes y una cantidad que permita formar grupos de 3 o 4 jugadores (con "
                     + participants.size() + " no es posible)");
         }
 
@@ -267,8 +258,7 @@ public class TournamentServiceImpl implements TournamentService {
                 .filter(Objects::nonNull)
                 .toList();
         if (!ineligible.isEmpty()) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Estos participantes ya no cumplen los requisitos y deben retirarse antes de iniciar: " + ineligible);
+            throw new ConflictException("Estos participantes ya no cumplen los requisitos y deben retirarse antes de iniciar: " + ineligible);
         }
 
         Map<Long, TournamentParticipant> byPlayer = indexByPlayer(participants);
@@ -323,11 +313,9 @@ public class TournamentServiceImpl implements TournamentService {
         GroupData group = calculateGroups(tournament).stream()
                 .filter(g -> g.groupNumber() == groupNumber)
                 .findFirst()
-                .orElseThrow(() -> new NoSuchElementException("Grupo no encontrado: " + groupNumber)); // TODO: Replace with custom ResourceNotFoundException
-
+                .orElseThrow(() -> new ResourceNotFoundException("Grupo no encontrado: " + groupNumber));
         if (!group.completed()) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El grupo todavía tiene partidos pendientes");
+            throw new ConflictException("El grupo todavía tiene partidos pendientes");
         }
 
         List<Long> ordered = dto.getOrderedPlayerIds();
@@ -335,8 +323,7 @@ public class TournamentServiceImpl implements TournamentService {
         boolean isUnresolvedTie = requested.size() == ordered.size() && group.standings().unresolvedTies().stream()
                 .anyMatch(tie -> new HashSet<>(tie).equals(requested));
         if (!isUnresolvedTie) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Los jugadores indicados no forman un empate sin resolver en el grupo " + groupNumber);
+            throw new ConflictException("Los jugadores indicados no forman un empate sin resolver en el grupo " + groupNumber);
         }
 
         Map<Long, TournamentParticipant> byPlayer = indexByPlayer(group.participants());
@@ -359,8 +346,7 @@ public class TournamentServiceImpl implements TournamentService {
 
         List<GroupData> groups = calculateGroups(tournament);
         if (groups.stream().anyMatch(g -> !g.completed())) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Todos los partidos de la fase de grupos deben estar finalizados");
+            throw new ConflictException("Todos los partidos de la fase de grupos deben estar finalizados");
         }
 
         List<Integer> blockedGroups = groups.stream()
@@ -368,8 +354,7 @@ public class TournamentServiceImpl implements TournamentService {
                 .map(GroupData::groupNumber)
                 .toList();
         if (!blockedGroups.isEmpty()) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Hay empates sin resolver que afectan la clasificación en los grupos " + blockedGroups
+            throw new ConflictException("Hay empates sin resolver que afectan la clasificación en los grupos " + blockedGroups
                     + ". El administrador debe resolverlos antes de generar la llave");
         }
 
@@ -393,8 +378,7 @@ public class TournamentServiceImpl implements TournamentService {
                     .map(c -> byPlayer.get(c.player1().playerId()).getPlayer().getName() + " vs "
                             + byPlayer.get(c.player2().playerId()).getPlayer().getName() + " (grupo " + c.player1().groupNumber() + ")")
                     .collect(Collectors.joining(", "));
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("No existe una llave que evite cruces del mismo grupo en la primera ronda: " + conflicts
+            throw new ConflictException("No existe una llave que evite cruces del mismo grupo en la primera ronda: " + conflicts
                     + ". Para generarla igualmente, repite la petición con allowSameGroupMatches=true");
         }
 
@@ -445,15 +429,12 @@ public class TournamentServiceImpl implements TournamentService {
 
         TournamentMatch match = tournamentMatchRepository.findById(tournamentMatchId)
                 .filter(m -> m.getTournament().getId().equals(tournamentId))
-                .orElseThrow(() -> new NoSuchElementException("Partido del torneo no encontrado con ID: " + tournamentMatchId)); // TODO: Replace with custom ResourceNotFoundException
-
+                .orElseThrow(() -> new ResourceNotFoundException("Partido del torneo no encontrado con ID: " + tournamentMatchId));
         if (match.getStatus() != TournamentMatchStatus.SCHEDULED) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Solo se puede declarar W.O. en un partido programado y sin resultado");
+            throw new ConflictException("Solo se puede declarar W.O. en un partido programado y sin resultado");
         }
         if (!match.hasPlayer(dto.getAbsentPlayerId())) {
-            // TODO: Replace with custom BadRequestException
-            throw new IllegalArgumentException("El jugador ausente no participa en este partido");
+            throw new InvalidMatchStateException("El jugador ausente no participa en este partido");
         }
 
         boolean player1Absent = match.getPlayer1().getId().equals(dto.getAbsentPlayerId());
@@ -480,8 +461,9 @@ public class TournamentServiceImpl implements TournamentService {
         return toResponse(tournament);
     }
 
+    // Runs in its own transaction because it is called after the Match transaction has committed
     @Override
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void applyConfirmedMatch(Long matchId) {
         tournamentMatchRepository.findByMatchId(matchId)
                 .filter(match -> match.getStatus() == TournamentMatchStatus.SCHEDULED)
@@ -491,16 +473,14 @@ public class TournamentServiceImpl implements TournamentService {
 
     private void applyOutcome(Tournament tournament, TournamentMatch match, MatchOutcome outcome) {
         if (!match.hasPlayer(outcome.winnerPlayerId())) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Resultado inválido: el ganador no participa en el partido " + match.getId());
+            throw new ConflictException("Resultado inválido: el ganador no participa en el partido " + match.getId());
         }
 
         boolean player1Won = match.getPlayer1().getId().equals(outcome.winnerPlayerId());
         int winnerSets = player1Won ? outcome.setsPlayer1() : outcome.setsPlayer2();
         int loserSets = player1Won ? outcome.setsPlayer2() : outcome.setsPlayer1();
         if (winnerSets <= loserSets) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("Resultado inválido: el ganador debe tener más sets que el perdedor en el partido " + match.getId());
+            throw new ConflictException("Resultado inválido: el ganador debe tener más sets que el perdedor en el partido " + match.getId());
         }
 
         match.setSetsPlayer1(outcome.setsPlayer1());
@@ -636,8 +616,7 @@ public class TournamentServiceImpl implements TournamentService {
 
     private Tournament findTournament(Long tournamentId) {
         return tournamentRepository.findById(tournamentId)
-                .orElseThrow(() -> new NoSuchElementException("Torneo no encontrado con ID: " + tournamentId)); // TODO: Replace with custom ResourceNotFoundException
-    }
+                .orElseThrow(() -> new ResourceNotFoundException("Torneo no encontrado con ID: " + tournamentId));    }
 
     // Tournaments are managed by the current admin of the organizing club
     private Tournament findManagedTournament(Long tournamentId, Long actingPlayerId) {
@@ -648,22 +627,19 @@ public class TournamentServiceImpl implements TournamentService {
 
     private void validateClubAdmin(Club club, Long actingPlayerId) {
         if (!club.getAdmin().getId().equals(actingPlayerId)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el administrador del club organizador puede gestionar sus torneos");
+            throw new UnauthorizedActionException("Solo el administrador del club organizador puede gestionar sus torneos");
         }
     }
 
     private void validateStatus(Tournament tournament, TournamentStatus expected, String message) {
         if (tournament.getStatus() != expected) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException(message);
+            throw new ConflictException(message);
         }
     }
 
     private void validateInProgress(Tournament tournament) {
         if (tournament.getStatus() != TournamentStatus.GROUP_STAGE && tournament.getStatus() != TournamentStatus.KNOCKOUT_STAGE) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El torneo no está en juego");
+            throw new ConflictException("El torneo no está en juego");
         }
     }
 

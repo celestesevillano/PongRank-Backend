@@ -13,6 +13,9 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -20,7 +23,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @Service
 @Transactional(readOnly = true)
@@ -46,19 +48,16 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     @Transactional
     public ClubMembershipResponseDTO requestMembership(Long actingPlayerId, ClubMembershipRequestDTO dto) {
         Player player = playerRepository.findById(actingPlayerId)
-                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + actingPlayerId)); // TODO: Replace with custom ResourceNotFoundException
-
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + actingPlayerId));
         Club club = findClubById(dto.getClubId());
         validateClubIsApproved(club);
 
         if (clubMembershipRepository.existsByPlayerIdAndStatusIn(actingPlayerId, ClubMembershipStatus.ACTIVE_STATUSES)) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El jugador ya pertenece a un club o tiene una solicitud pendiente");
+            throw new ConflictException("El jugador ya pertenece a un club o tiene una solicitud pendiente");
         }
 
         if (clubRepository.existsByAdminIdAndStatusIn(actingPlayerId, ClubStatus.ACTIVE_STATUSES)) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El jugador administra un club en revisión o aprobado y no puede unirse a otro");
+            throw new ConflictException("El jugador administra un club en revisión o aprobado y no puede unirse a otro");
         }
 
         ClubMembership membership = ClubMembership.builder()
@@ -93,8 +92,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         Long playerId = membership.getPlayer().getId();
         if (clubMembershipRepository.existsByPlayerIdAndStatusInAndClubIdNot(
                 playerId, List.of(ClubMembershipStatus.APPROVED), membership.getClub().getId())) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El jugador ya pertenece a otro club");
+            throw new ConflictException("El jugador ya pertenece a otro club");
         }
 
         membership.setStatus(ClubMembershipStatus.APPROVED);
@@ -135,8 +133,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         validateMembershipStatus(membership, ClubMembershipStatus.APPROVED);
 
         if (isClubAdmin(membership.getClub(), actingPlayerId)) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El administrador debe transferir la administración antes de abandonar el club");
+            throw new ConflictException("El administrador debe transferir la administración antes de abandonar el club");
         }
 
         membership.setStatus(ClubMembershipStatus.LEFT);
@@ -156,8 +153,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     @Override
     public PageResponseDTO<ClubMembershipResponseDTO> getPlayerMembershipHistory(Long playerId, int page, int size) {
         if (!playerRepository.existsById(playerId)) {
-            // TODO: Replace with custom ResourceNotFoundException
-            throw new NoSuchElementException("Jugador no encontrado con ID: " + playerId);
+            throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }
         return PageResponseDTO.from(clubMembershipRepository.findByPlayerId(
                 playerId, PageRequestFactory.of(page, size, Sort.by("createdAt").descending())),
@@ -194,8 +190,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         }
 
         if (hasActiveMembershipOutsideClub(admin.getId(), club.getId())) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El administrador del club ya pertenece a otro club o tiene una solicitud pendiente");
+            throw new ConflictException("El administrador del club ya pertenece a otro club o tiene una solicitud pendiente");
         }
 
         ClubMembership adminMembership = ClubMembership.builder()
@@ -217,12 +212,10 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
 
         ClubMembership currentAdminMembership = clubMembershipRepository
                 .findByPlayerIdAndClubIdAndStatus(club.getAdmin().getId(), clubId, ClubMembershipStatus.APPROVED)
-                .orElseThrow(() -> new IllegalStateException("El administrador actual no tiene una membresía activa en el club")); // TODO: Replace with custom ConflictException
-
+                .orElseThrow(() -> new ConflictException("El administrador actual no tiene una membresía activa en el club"));
         ClubMembership newAdminMembership = clubMembershipRepository
                 .findByPlayerIdAndClubIdAndStatus(newAdminPlayerId, clubId, ClubMembershipStatus.APPROVED)
-                .orElseThrow(() -> new IllegalStateException("El nuevo administrador debe ser miembro activo del club")); // TODO: Replace with custom ConflictException
-
+                .orElseThrow(() -> new ConflictException("El nuevo administrador debe ser miembro activo del club"));
         currentAdminMembership.setRole(ClubMembershipRole.MEMBER);
         newAdminMembership.setRole(ClubMembershipRole.CLUB_ADMIN);
 
@@ -234,13 +227,11 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
 
     private Club findClubById(Long clubId) {
         return clubRepository.findById(clubId)
-                .orElseThrow(() -> new NoSuchElementException("Club no encontrado con ID: " + clubId)); // TODO: Replace with custom ResourceNotFoundException
-    }
+                .orElseThrow(() -> new ResourceNotFoundException("Club no encontrado con ID: " + clubId));    }
 
     private ClubMembership findMembershipById(Long membershipId) {
         return clubMembershipRepository.findById(membershipId)
-                .orElseThrow(() -> new NoSuchElementException("Membresía no encontrada con ID: " + membershipId)); // TODO: Replace with custom ResourceNotFoundException
-    }
+                .orElseThrow(() -> new ResourceNotFoundException("Membresía no encontrada con ID: " + membershipId));    }
 
     private ClubMembership findPendingMembershipManagedBy(Long membershipId, Long actingPlayerId) {
         ClubMembership membership = findMembershipById(membershipId);
@@ -255,29 +246,25 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
 
     private void validateClubAdmin(Club club, Long actingPlayerId) {
         if (!isClubAdmin(club, actingPlayerId)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el administrador del club puede gestionar sus membresías");
+            throw new UnauthorizedActionException("Solo el administrador del club puede gestionar sus membresías");
         }
     }
 
     private void validateMembershipOwner(ClubMembership membership, Long actingPlayerId) {
         if (!membership.getPlayer().getId().equals(actingPlayerId)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el propio jugador puede realizar esta acción sobre su membresía");
+            throw new UnauthorizedActionException("Solo el propio jugador puede realizar esta acción sobre su membresía");
         }
     }
 
     private void validateMembershipStatus(ClubMembership membership, ClubMembershipStatus expectedStatus) {
         if (membership.getStatus() != expectedStatus) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("La membresía debe estar en estado " + expectedStatus + " para realizar esta acción");
+            throw new ConflictException("La membresía debe estar en estado " + expectedStatus + " para realizar esta acción");
         }
     }
 
     private void validateClubIsApproved(Club club) {
         if (club.getStatus() != ClubStatus.APPROVED) {
-            // TODO: Replace with custom ConflictException
-            throw new IllegalStateException("El club no está aprobado y no puede aceptar miembros");
+            throw new ConflictException("El club no está aprobado y no puede aceptar miembros");
         }
     }
 

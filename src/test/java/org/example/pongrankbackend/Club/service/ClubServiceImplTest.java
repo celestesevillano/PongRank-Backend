@@ -22,6 +22,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
@@ -114,7 +116,7 @@ class ClubServiceImplTest {
         when(clubRepository.existsByNameIgnoreCase("Club Lima")).thenReturn(true);
 
         assertThatThrownBy(() -> clubService.registerClub(ADMIN_ID, dto))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Ya existe un club");
 
         verify(clubRepository, never()).save(any());
@@ -130,7 +132,7 @@ class ClubServiceImplTest {
         when(clubMembershipService.hasActiveMembershipOutsideClub(ADMIN_ID, null)).thenReturn(true);
 
         assertThatThrownBy(() -> clubService.registerClub(ADMIN_ID, dto))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubRepository, never()).save(any());
     }
@@ -141,7 +143,7 @@ class ClubServiceImplTest {
         when(playerRepository.findById(OTHER_PLAYER_ID)).thenReturn(Optional.of(player(OTHER_PLAYER_ID, Role.ROLE_USER)));
 
         assertThatThrownBy(() -> clubService.approveClub(CLUB_ID, OTHER_PLAYER_ID))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedActionException.class)
                 .hasMessageContaining("administrador general");
 
         verify(clubRepository, never()).saveAndFlush(any());
@@ -174,11 +176,11 @@ class ClubServiceImplTest {
 
         when(playerRepository.findById(SYSTEM_ADMIN_ID)).thenReturn(Optional.of(player(SYSTEM_ADMIN_ID, Role.ROLE_SYSTEM_ADMIN)));
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
-        doThrow(new IllegalStateException("fallo al crear membresía"))
+        doThrow(new ConflictException("fallo al crear membresía"))
                 .when(clubMembershipService).addAdminAsMember(club);
 
         assertThatThrownBy(() -> clubService.approveClub(CLUB_ID, SYSTEM_ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("fallo al crear membresía");
     }
 
@@ -190,7 +192,7 @@ class ClubServiceImplTest {
         when(clubMembershipService.hasActiveMembershipOutsideClub(ADMIN_ID, CLUB_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> clubService.approveClub(CLUB_ID, SYSTEM_ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubRepository, never()).saveAndFlush(any());
     }
@@ -219,7 +221,7 @@ class ClubServiceImplTest {
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
 
         assertThatThrownBy(() -> clubService.resubmitClub(CLUB_ID, ADMIN_ID, new ClubResubmitRequestDTO()))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubRepository, never()).saveAndFlush(any());
     }
@@ -265,7 +267,7 @@ class ClubServiceImplTest {
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
 
         assertThatThrownBy(() -> clubService.updateClub(CLUB_ID, OTHER_PLAYER_ID, new ClubUpdateRequestDTO()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
 
         verify(clubRepository, never()).saveAndFlush(any());
     }
@@ -277,7 +279,7 @@ class ClubServiceImplTest {
         when(playerRepository.findById(OTHER_PLAYER_ID)).thenReturn(Optional.of(player(OTHER_PLAYER_ID, Role.ROLE_USER)));
 
         assertThatThrownBy(() -> clubService.getClubReview(CLUB_ID, OTHER_PLAYER_ID))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
     }
 
     @Test
@@ -307,7 +309,7 @@ class ClubServiceImplTest {
                 .thenReturn(true);
 
         assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID, ADMIN_ID, dto))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubMembershipService, never()).transferAdminRole(any(), any());
         assertThat(club.getAdmin().getId()).isEqualTo(ADMIN_ID);
@@ -320,7 +322,7 @@ class ClubServiceImplTest {
 
         assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID, ADMIN_ID,
                 ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build()))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test
@@ -331,7 +333,7 @@ class ClubServiceImplTest {
         when(clubRepository.existsByAdminIdAndStatusInAndIdNot(ADMIN_ID, ClubStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> clubService.resubmitClub(CLUB_ID, ADMIN_ID, new ClubResubmitRequestDTO()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("administra otro club");
         assertThat(club.getStatus()).isEqualTo(ClubStatus.REJECTED);
     }
@@ -359,7 +361,7 @@ class ClubServiceImplTest {
         when(playerRepository.findById(OTHER_PLAYER_ID)).thenReturn(Optional.of(player(OTHER_PLAYER_ID, Role.ROLE_USER)));
 
         assertThatThrownBy(() -> clubService.getPendingClubs(OTHER_PLAYER_ID, 0, 10))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
 
         verify(clubRepository, never()).findByStatus(any(), any());
     }

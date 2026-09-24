@@ -17,8 +17,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
-import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -92,7 +93,7 @@ class ClubMembershipServiceImplTest {
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
 
         assertThatThrownBy(() -> clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID)))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no está aprobado");
 
         verify(clubMembershipRepository, never()).save(any());
@@ -107,7 +108,7 @@ class ClubMembershipServiceImplTest {
                 .thenReturn(true);
 
         assertThatThrownBy(() -> clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }
@@ -120,7 +121,7 @@ class ClubMembershipServiceImplTest {
         when(clubRepository.existsByAdminIdAndStatusIn(PLAYER_ID, ClubStatus.ACTIVE_STATUSES)).thenReturn(true);
 
         assertThatThrownBy(() -> clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }
@@ -149,7 +150,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID, OTHER_PLAYER_ID))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.PENDING);
     }
@@ -188,7 +189,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.cancelRequest(MEMBERSHIP_ID, OTHER_PLAYER_ID))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
     }
 
     @Test
@@ -211,7 +212,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.leaveClub(MEMBERSHIP_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("transferir");
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.APPROVED);
@@ -273,7 +274,7 @@ class ClubMembershipServiceImplTest {
                 ADMIN_ID, ClubMembershipStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> clubMembershipService.addAdminAsMember(club))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }
@@ -290,7 +291,7 @@ class ClubMembershipServiceImplTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> clubMembershipService.transferAdminRole(club, PLAYER_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("miembro activo");
 
         assertThat(adminMembership.getRole()).isEqualTo(ClubMembershipRole.CLUB_ADMIN);
@@ -325,7 +326,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.cancelRequest(MEMBERSHIP_ID, PLAYER_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.APPROVED);
     }
 
@@ -337,7 +338,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
         verify(clubMembershipRepository, never()).saveAndFlush(any());
     }
 
@@ -349,7 +350,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.rejectRequest(MEMBERSHIP_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.CANCELLED);
     }
 
@@ -361,7 +362,7 @@ class ClubMembershipServiceImplTest {
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
         assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.PENDING);
     }
 
@@ -396,7 +397,7 @@ class ClubMembershipServiceImplTest {
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
 
         assertThatThrownBy(() -> clubMembershipService.getPendingRequests(CLUB_ID, OTHER_PLAYER_ID, 0, 10))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
 
         verify(clubMembershipRepository, never()).findByClubIdAndStatus(any(), any(), any());
     }

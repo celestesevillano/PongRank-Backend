@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.Tournament.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -34,4 +35,10 @@ public class TournamentCreateRequestDTO {
     private LocalDateTime startDate;
 
     private LocalDateTime endDate;
+
+    // Validated by @Valid in the controller: an invalid range returns 400 through the shared handler
+    @AssertTrue(message = "La fecha de fin no puede ser anterior a la fecha de inicio")
+    public boolean isDateRangeValid() {
+        return startDate == null || endDate == null || !endDate.isBefore(startDate);
+    }
 }

@@ -44,6 +44,6 @@ public interface TournamentService {
 
     TournamentResponseDTO syncMatchResults(Long tournamentId, Long actingPlayerId);
 
-    // Integration hook for the Match module: call it when a Match becomes CONFIRMED (not exposed through HTTP)
+    // Called by TournamentMatchEventListener when the Match module publishes MatchConfirmedEvent (not exposed through HTTP)
     void applyConfirmedMatch(Long matchId);
 }

@@ -36,8 +36,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
-import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -118,7 +120,7 @@ class TournamentServiceImplTest {
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
 
         assertThatThrownBy(() -> tournamentService.createTournament(ADMIN_ID, createDto()))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("APPROVED");
         verify(tournamentRepository, never()).save(any());
     }
@@ -129,7 +131,7 @@ class TournamentServiceImplTest {
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
 
         assertThatThrownBy(() -> tournamentService.createTournament(OUTSIDER_ID, createDto()))
-                .isInstanceOf(IllegalArgumentException.class);
+                .isInstanceOf(UnauthorizedActionException.class);
         verify(tournamentRepository, never()).save(any());
     }
 
@@ -160,7 +162,7 @@ class TournamentServiceImplTest {
         when(playerRepository.findById(5L)).thenReturn(Optional.of(suspended));
 
         assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("ACTIVE");
         verify(participantRepository, never()).saveAll(any());
     }
@@ -173,7 +175,7 @@ class TournamentServiceImplTest {
         when(clubMembershipService.isActiveMember(CLUB_ID, 5L)).thenReturn(false);
 
         assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("INTERNAL");
     }
 
@@ -201,7 +203,7 @@ class TournamentServiceImplTest {
         when(participantRepository.existsByTournamentIdAndPlayerId(TOURNAMENT_ID, 5L)).thenReturn(true);
 
         assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("ya está inscrito");
     }
 
@@ -211,7 +213,7 @@ class TournamentServiceImplTest {
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE)));
 
         assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
         verify(playerRepository, never()).findById(any());
     }
 
@@ -229,7 +231,7 @@ class TournamentServiceImplTest {
         when(participantRepository.findByTournamentIdOrderBySeedAsc(TOURNAMENT_ID)).thenReturn(five);
 
         assertThatThrownBy(() -> tournamentService.startTournament(TOURNAMENT_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
         verify(matchIntegrationPort, never()).createMatch(any(), any(), any());
     }
 
@@ -246,7 +248,7 @@ class TournamentServiceImplTest {
         when(participantRepository.findByTournamentIdOrderBySeedAsc(TOURNAMENT_ID)).thenReturn(four);
 
         assertThatThrownBy(() -> tournamentService.startTournament(TOURNAMENT_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("retirarse");
         verify(matchIntegrationPort, never()).createMatch(any(), any(), any());
     }
@@ -315,7 +317,7 @@ class TournamentServiceImplTest {
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(999L, 2, 0, 22, 10)));
 
         assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Resultado inválido");
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.SCHEDULED);
     }
@@ -333,7 +335,7 @@ class TournamentServiceImplTest {
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 1, 2, 30, 31)));
 
         assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ConflictException.class);
     }
 
     @Test
@@ -406,7 +408,7 @@ class TournamentServiceImplTest {
                 .thenReturn(List.of(pending, completed(t, 1, a, c), completed(t, 1, b, c)));
 
         assertThatThrownBy(() -> tournamentService.generateKnockout(TOURNAMENT_ID, ADMIN_ID, false))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("finalizados");
     }
 
@@ -461,7 +463,7 @@ class TournamentServiceImplTest {
                 completed(t, 1, a, b), completed(t, 1, a, c), completed(t, 1, b, c)));
 
         assertThatThrownBy(() -> tournamentService.generateKnockout(TOURNAMENT_ID, ADMIN_ID, false))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("allowSameGroupMatches");
         verify(tournamentMatchRepository, never()).saveAll(any());
     }
@@ -490,7 +492,7 @@ class TournamentServiceImplTest {
         when(clubRepository.existsById(CLUB_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> tournamentService.getClubTournaments(CLUB_ID, 0, 10))
-                .isInstanceOf(NoSuchElementException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
         verify(tournamentRepository, never()).findByClubId(any(), any());
     }
 }
