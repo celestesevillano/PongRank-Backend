@@ -41,4 +41,8 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
            "WHERE m.player2 IS NULL AND m.status = :status " +
            "ORDER BY m.createdAt DESC")
     List<Match> findOpenChallenges(@Param("status") MatchStatus status);
+
+    List<Match> findByTournamentId(Long tournamentId);
+
+    Page<Match> findByTournamentId(Long tournamentId, Pageable pageable);
 }

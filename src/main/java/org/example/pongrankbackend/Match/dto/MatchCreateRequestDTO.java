@@ -21,10 +21,12 @@ public class MatchCreateRequestDTO {
     @Builder.Default
     private MatchFormat format = MatchFormat.BO3;
 
-    @NotNull(message = "El tipo de emparejamiento (matchType) es obligatorio: FRIEND, COMMUNITY o LOCATION")
+    @NotNull(message = "El tipo de emparejamiento (matchType) es obligatorio: FRIEND, COMMUNITY, LOCATION o TOURNAMENT")
     private MatchType matchType;
 
     private Long communityId;
+
+    private Long tournamentId;
 
     private BigDecimal latitude;
 

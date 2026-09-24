@@ -61,6 +61,17 @@ public class MatchController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Listado de partidos disputados en un torneo con paginación y orden cronológico descendente.
+     */
+    @GetMapping("/tournament/{tournamentId}")
+    public ResponseEntity<Page<MatchResponseDTO>> getMatchesByTournament(
+            @PathVariable Long tournamentId,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        Page<MatchResponseDTO> response = matchService.getMatchesByTournament(tournamentId, pageable);
+        return ResponseEntity.ok(response);
+    }
+
     // TODO: Extract submittingPlayerId from authenticated user via SecurityContext
     @PostMapping("/{matchId}/submit")
     public ResponseEntity<MatchDetailResponseDTO> submitScore(

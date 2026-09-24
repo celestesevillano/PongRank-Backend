@@ -49,6 +49,13 @@ public class MatchRuleValidator {
             case FRIEND -> validateFriendMatch(player2, friendshipOpt);
             case COMMUNITY -> validateCommunityMatch(dto);
             case LOCATION -> validateLocationMatch(dto);
+            case TOURNAMENT -> validateTournamentMatch(player2);
+        }
+    }
+
+    private void validateTournamentMatch(Player player2) {
+        if (player2 == null) {
+            throw new InvalidMatchStateException("Para un partido de torneo (TOURNAMENT) es obligatorio especificar el oponente");
         }
     }
 

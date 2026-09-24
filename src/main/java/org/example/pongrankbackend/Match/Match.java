@@ -6,6 +6,7 @@ import lombok.*;
 import org.example.pongrankbackend.Community.Community;
 import org.example.pongrankbackend.MatchSet.MatchSet;
 import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Tournament.Tournament;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -37,6 +38,10 @@ public class Match {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "community_id")
     private Community community;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "tournament_id")
+    private Tournament tournament;
 
     @NotNull
     @Enumerated(EnumType.STRING)
