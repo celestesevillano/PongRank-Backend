@@ -61,7 +61,15 @@ public class PlayerServiceImpl implements PlayerService {
     public PlayerResponseDTO getPlayerById(Long id) {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + id));
-        return modelMapper.map(player, PlayerResponseDTO.class);
+        PlayerResponseDTO response = modelMapper.map(player, PlayerResponseDTO.class);
+        Long currentUserId = org.example.pongrankbackend.security.SecurityUtils.getCurrentUserId().orElse(null);
+        boolean isOwnerOrAdmin = (currentUserId != null && currentUserId.equals(id))
+                || org.example.pongrankbackend.security.SecurityUtils.hasRole("SYSTEM_ADMIN");
+        if (!isOwnerOrAdmin && Boolean.FALSE.equals(player.getShareContact())) {
+            response.setEmail(null);
+            response.setWhatsapp(null);
+        }
+        return response;
     }
 
     @Override

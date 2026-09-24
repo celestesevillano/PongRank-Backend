@@ -8,6 +8,10 @@ import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.service.PlayerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.security.CustomUserDetails;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -20,14 +24,12 @@ public class PlayerController {
         this.playerService = playerService;
     }
 
-    // TODO: Endpoint may be moved to AuthController when full authentication module is integrated
     @PostMapping("/register")
     public ResponseEntity<PlayerResponseDTO> registerPlayer(@Valid @RequestBody PlayerRegisterRequestDTO dto) {
         PlayerResponseDTO response = playerService.registerPlayer(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // TODO: Protect via SecurityContext so users cannot arbitrarily query another user's private profile
     @GetMapping("/{playerId}")
     public ResponseEntity<PlayerResponseDTO> getPlayerById(@PathVariable Long playerId) {
         PlayerResponseDTO response = playerService.getPlayerById(playerId);
@@ -40,11 +42,15 @@ public class PlayerController {
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Validate playerId against authenticated user via SecurityContext
     @PatchMapping("/{playerId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PlayerResponseDTO> updatePlayer(
             @PathVariable Long playerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody PlayerUpdateRequestDTO dto) {
+        if (!currentUser.getId().equals(playerId) && !currentUser.getRole().equals("ROLE_SYSTEM_ADMIN")) {
+            throw new UnauthorizedActionException("Solo puedes actualizar la información de tu propio perfil");
+        }
         PlayerResponseDTO response = playerService.updatePlayer(playerId, dto);
         return ResponseEntity.ok(response);
     }
