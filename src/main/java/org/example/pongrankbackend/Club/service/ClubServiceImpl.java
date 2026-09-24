@@ -1,0 +1,325 @@
+package org.example.pongrankbackend.Club.service;
+
+import org.example.pongrankbackend.Club.Club;
+import org.example.pongrankbackend.Club.ClubReview;
+import org.example.pongrankbackend.Club.ClubStatus;
+import org.example.pongrankbackend.Club.dto.ClubAdminTransferRequestDTO;
+import org.example.pongrankbackend.Club.dto.ClubAffiliationDocumentRequestDTO;
+import org.example.pongrankbackend.Club.dto.ClubRegisterRequestDTO;
+import org.example.pongrankbackend.Club.dto.ClubRejectRequestDTO;
+import org.example.pongrankbackend.Club.dto.ClubResponseDTO;
+import org.example.pongrankbackend.Club.dto.ClubResubmitRequestDTO;
+import org.example.pongrankbackend.Club.dto.ClubReviewHistoryDTO;
+import org.example.pongrankbackend.Club.dto.ClubReviewResponseDTO;
+import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
+import org.example.pongrankbackend.Club.repository.ClubRepository;
+import org.example.pongrankbackend.Club.repository.ClubReviewRepository;
+import org.example.pongrankbackend.ClubMembership.service.ClubMembershipService;
+import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Player.Role;
+import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.common.pagination.PageRequestFactory;
+import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Sort;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.NoSuchElementException;
+
+@Service
+@Transactional(readOnly = true)
+public class ClubServiceImpl implements ClubService {
+
+    private final ClubRepository clubRepository;
+    private final ClubReviewRepository clubReviewRepository;
+    private final PlayerRepository playerRepository;
+    private final ClubMembershipService clubMembershipService;
+    private final ModelMapper modelMapper;
+
+    public ClubServiceImpl(ClubRepository clubRepository,
+                           ClubReviewRepository clubReviewRepository,
+                           PlayerRepository playerRepository,
+                           ClubMembershipService clubMembershipService,
+                           ModelMapper modelMapper) {
+        this.clubRepository = clubRepository;
+        this.clubReviewRepository = clubReviewRepository;
+        this.playerRepository = playerRepository;
+        this.clubMembershipService = clubMembershipService;
+        this.modelMapper = modelMapper;
+    }
+
+    // TODO: Replace requesterId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubResponseDTO registerClub(Long requesterId, ClubRegisterRequestDTO dto) {
+        Player requester = findPlayerById(requesterId);
+        validateCanAdministerClub(requesterId, null);
+
+        String normalizedName = dto.getName().trim();
+        validateNameIsAvailable(normalizedName);
+
+        Club club = Club.builder()
+                .name(normalizedName)
+                .address(dto.getAddress().trim())
+                .affiliationDocumentUrl(dto.getAffiliationDocumentUrl().trim())
+                .admin(requester)
+                .status(ClubStatus.PENDING)
+                .build();
+
+        Club savedClub = clubRepository.save(club);
+        return modelMapper.map(savedClub, ClubResponseDTO.class);
+    }
+
+    @Override
+    public PageResponseDTO<ClubResponseDTO> getApprovedClubs(int page, int size) {
+        return PageResponseDTO.from(
+                clubRepository.findByStatus(ClubStatus.APPROVED, PageRequestFactory.of(page, size, Sort.by("name").ascending())),
+                club -> modelMapper.map(club, ClubResponseDTO.class));
+    }
+
+    @Override
+    public ClubResponseDTO getClubById(Long clubId) {
+        Club club = findClubById(clubId);
+        return modelMapper.map(club, ClubResponseDTO.class);
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubResponseDTO updateClub(Long clubId, Long actingPlayerId, ClubUpdateRequestDTO dto) {
+        Club club = findClubById(clubId);
+        validateClubAdmin(club, actingPlayerId);
+
+        if (dto.getName() != null) {
+            String normalizedName = dto.getName().trim();
+            if (!normalizedName.equalsIgnoreCase(club.getName())) {
+                validateNameIsAvailable(normalizedName);
+            }
+            club.setName(normalizedName);
+        }
+
+        if (dto.getAddress() != null) {
+            club.setAddress(dto.getAddress().trim());
+        }
+
+        Club updatedClub = clubRepository.saveAndFlush(club);
+        return modelMapper.map(updatedClub, ClubResponseDTO.class);
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    public ClubReviewResponseDTO getClubReview(Long clubId, Long actingPlayerId) {
+        Club club = findClubById(clubId);
+
+        if (!isClubAdmin(club, actingPlayerId) && !isSystemAdmin(findPlayerById(actingPlayerId))) {
+            // TODO: Replace with custom ForbiddenException / AccessDeniedException
+            throw new IllegalArgumentException("Solo el administrador del club o el administrador general pueden ver la revisión");
+        }
+
+        return modelMapper.map(club, ClubReviewResponseDTO.class);
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubResponseDTO resubmitClub(Long clubId, Long actingPlayerId, ClubResubmitRequestDTO dto) {
+        Club club = findClubById(clubId);
+        validateClubAdmin(club, actingPlayerId);
+        validateClubStatus(club, ClubStatus.REJECTED, "Solo un club rechazado puede reenviarse a revisión");
+        validateCanAdministerClub(actingPlayerId, clubId);
+
+        return sendToReview(club, dto.getAffiliationDocumentUrl());
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubResponseDTO replaceAffiliationDocument(Long clubId, Long actingPlayerId, ClubAffiliationDocumentRequestDTO dto) {
+        Club club = findClubById(clubId);
+        validateClubAdmin(club, actingPlayerId);
+
+        if (club.getStatus() == ClubStatus.REJECTED) {
+            // TODO: Replace with custom ConflictException
+            throw new IllegalStateException("Un club rechazado debe reemplazar su documento al reenviarse a revisión");
+        }
+
+        return sendToReview(club, dto.getAffiliationDocumentUrl());
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubResponseDTO transferAdministration(Long clubId, Long actingPlayerId, ClubAdminTransferRequestDTO dto) {
+        Club club = findClubById(clubId);
+        validateClubAdmin(club, actingPlayerId);
+        validateClubStatus(club, ClubStatus.APPROVED, "Solo un club aprobado puede transferir su administración");
+
+        if (actingPlayerId.equals(dto.getNewAdminPlayerId())) {
+            // TODO: Replace with custom BadRequestException
+            throw new IllegalArgumentException("El nuevo administrador debe ser un jugador distinto al actual");
+        }
+
+        if (clubRepository.existsByAdminIdAndStatusInAndIdNot(dto.getNewAdminPlayerId(), ClubStatus.ACTIVE_STATUSES, clubId)) {
+            // TODO: Replace with custom ConflictException
+            throw new IllegalStateException("El nuevo administrador ya administra otro club en revisión o aprobado");
+        }
+
+        Player newAdmin = clubMembershipService.transferAdminRole(club, dto.getNewAdminPlayerId());
+        club.setAdmin(newAdmin);
+
+        Club updatedClub = clubRepository.saveAndFlush(club);
+        return modelMapper.map(updatedClub, ClubResponseDTO.class);
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    public PageResponseDTO<ClubReviewResponseDTO> getPendingClubs(Long actingPlayerId, int page, int size) {
+        findSystemAdmin(actingPlayerId);
+
+        // Oldest requests first, so they are reviewed in arrival order
+        return PageResponseDTO.from(
+                clubRepository.findByStatus(ClubStatus.PENDING, PageRequestFactory.of(page, size, Sort.by("updatedAt").ascending())),
+                club -> modelMapper.map(club, ClubReviewResponseDTO.class));
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubReviewResponseDTO approveClub(Long clubId, Long actingPlayerId) {
+        Player reviewer = findSystemAdmin(actingPlayerId);
+        Club club = findClubById(clubId);
+        validateClubStatus(club, ClubStatus.PENDING, "El club ya fue revisado o no está en estado PENDING");
+        validateCanAdministerClub(club.getAdmin().getId(), clubId);
+
+        club.setStatus(ClubStatus.APPROVED);
+        club.setRejectionReason(null);
+        Club approvedClub = clubRepository.saveAndFlush(club);
+
+        recordReview(club, reviewer, ClubStatus.APPROVED, null);
+        clubMembershipService.addAdminAsMember(club);
+
+        return modelMapper.map(approvedClub, ClubReviewResponseDTO.class);
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    @Transactional
+    public ClubReviewResponseDTO rejectClub(Long clubId, Long actingPlayerId, ClubRejectRequestDTO dto) {
+        Player reviewer = findSystemAdmin(actingPlayerId);
+        Club club = findClubById(clubId);
+        validateClubStatus(club, ClubStatus.PENDING, "El club ya fue revisado o no está en estado PENDING");
+
+        String reason = dto.getRejectionReason().trim();
+        club.setStatus(ClubStatus.REJECTED);
+        club.setRejectionReason(reason);
+        Club rejectedClub = clubRepository.saveAndFlush(club);
+
+        recordReview(club, reviewer, ClubStatus.REJECTED, reason);
+
+        return modelMapper.map(rejectedClub, ClubReviewResponseDTO.class);
+    }
+
+    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
+    @Override
+    public PageResponseDTO<ClubReviewHistoryDTO> getReviewHistory(Long clubId, Long actingPlayerId, int page, int size) {
+        findSystemAdmin(actingPlayerId);
+        findClubById(clubId);
+
+        return PageResponseDTO.from(
+                clubReviewRepository.findByClubId(clubId, PageRequestFactory.of(page, size, Sort.by("reviewedAt").descending())),
+                review -> modelMapper.map(review, ClubReviewHistoryDTO.class));
+    }
+
+    private ClubResponseDTO sendToReview(Club club, String newAffiliationDocumentUrl) {
+        if (newAffiliationDocumentUrl != null) {
+            club.setAffiliationDocumentUrl(newAffiliationDocumentUrl.trim());
+        }
+        club.setStatus(ClubStatus.PENDING);
+        club.setRejectionReason(null);
+
+        Club pendingClub = clubRepository.saveAndFlush(club);
+        return modelMapper.map(pendingClub, ClubResponseDTO.class);
+    }
+
+    private void recordReview(Club club, Player reviewer, ClubStatus result, String reason) {
+        ClubReview review = ClubReview.builder()
+                .club(club)
+                .reviewer(reviewer)
+                .result(result)
+                .reason(reason)
+                .affiliationDocumentUrl(club.getAffiliationDocumentUrl())
+                .build();
+
+        clubReviewRepository.save(review);
+    }
+
+    // Single-club rule (D1): a player can only be responsible for one club in progress at a time.
+    // currentClubId excludes the club being resubmitted or approved; null when registering a new club.
+    private void validateCanAdministerClub(Long playerId, Long currentClubId) {
+        if (clubMembershipService.hasActiveMembershipOutsideClub(playerId, currentClubId)) {
+            // TODO: Replace with custom ConflictException
+            throw new IllegalStateException("El jugador ya pertenece a otro club o tiene una solicitud de ingreso pendiente");
+        }
+
+        boolean administersAnotherClub = currentClubId == null
+                ? clubRepository.existsByAdminIdAndStatusIn(playerId, ClubStatus.ACTIVE_STATUSES)
+                : clubRepository.existsByAdminIdAndStatusInAndIdNot(playerId, ClubStatus.ACTIVE_STATUSES, currentClubId);
+
+        if (administersAnotherClub) {
+            // TODO: Replace with custom ConflictException
+            throw new IllegalStateException("El jugador ya administra otro club en revisión o aprobado");
+        }
+    }
+
+    private Player findPlayerById(Long playerId) {
+        return playerRepository.findById(playerId)
+                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + playerId)); // TODO: Replace with custom ResourceNotFoundException
+    }
+
+    private Club findClubById(Long clubId) {
+        return clubRepository.findById(clubId)
+                .orElseThrow(() -> new NoSuchElementException("Club no encontrado con ID: " + clubId)); // TODO: Replace with custom ResourceNotFoundException
+    }
+
+    private void validateClubStatus(Club club, ClubStatus expectedStatus, String message) {
+        if (club.getStatus() != expectedStatus) {
+            // TODO: Replace with custom ConflictException
+            throw new IllegalStateException(message);
+        }
+    }
+
+    private void validateNameIsAvailable(String normalizedName) {
+        if (clubRepository.existsByNameIgnoreCase(normalizedName)) {
+            // TODO: Replace with custom ConflictException
+            throw new IllegalStateException("Ya existe un club registrado con el nombre '" + normalizedName + "'");
+        }
+    }
+
+    private boolean isClubAdmin(Club club, Long playerId) {
+        return club.getAdmin().getId().equals(playerId);
+    }
+
+    private void validateClubAdmin(Club club, Long actingPlayerId) {
+        if (!isClubAdmin(club, actingPlayerId)) {
+            // TODO: Replace with custom ForbiddenException / AccessDeniedException
+            throw new IllegalArgumentException("Solo el administrador del club puede realizar esta acción");
+        }
+    }
+
+    private boolean isSystemAdmin(Player player) {
+        return player.getRole() == Role.ROLE_SYSTEM_ADMIN;
+    }
+
+    // NOTE: Reads Player.role but cannot be trusted until actingPlayerId comes from the JWT
+    private Player findSystemAdmin(Long actingPlayerId) {
+        Player actingPlayer = findPlayerById(actingPlayerId);
+
+        if (!isSystemAdmin(actingPlayer)) {
+            // TODO: Replace with custom ForbiddenException / AccessDeniedException
+            throw new IllegalArgumentException("Solo el administrador general de PongRank puede revisar clubes");
+        }
+
+        return actingPlayer;
+    }
+}
