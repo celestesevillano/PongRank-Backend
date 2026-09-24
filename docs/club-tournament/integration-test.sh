@@ -7,13 +7,17 @@
 # bracket must advance automatically through MatchConfirmedEvent. Any unexpected HTTP 500 fails the run.
 #
 # Usage (from the project root, with the app already running against the isolated DB):
-#   ./docs/club-tournament/integration-test.sh [BASE_URL] [DB_CONTAINER] [DB_NAME]
+#   ./docs/club-tournament/integration-test.sh [BASE_URL] [DB_CONTAINER] [DB_NAME] [MATCH_MODE]
+# MATCH_MODE=http (default): matches are played through the Match module endpoints (end-to-end).
+# MATCH_MODE=sql: confirmed results are written in the isolated DB and read through MatchService with
+#                 sync-results (use it only while the Match submit endpoint has a known defect).
 # =============================================================================
 set -u
 
 BASE_URL="${1:-http://localhost:8081}"
 DB_CONTAINER="${2:-pongrank-postgres}"
 DB_NAME="${3:-pongrank_it}"
+MATCH_MODE="${4:-http}"
 RUN_ID="$(date +%s)"
 PASS=0
 FAIL=0
@@ -61,7 +65,12 @@ register() {
   echo "$BODY" | json "d['id']"
 }
 
-play_match() { # play_match MATCH_ID PLAYER1_ID PLAYER2_ID -> player1 wins 2-0 (BO3) through the Match module
+play_match() { # play_match MATCH_ID PLAYER1_ID PLAYER2_ID -> player1 wins 2-0 (BO3)
+  if [ "$MATCH_MODE" = "sql" ]; then
+    sql "UPDATE matches SET status='CONFIRMED', confirmed_at=now() WHERE id=$1;
+         INSERT INTO match_sets (match_id, set_number, score_player1, score_player2) VALUES ($1,1,11,5),($1,2,12,10);"
+    return
+  fi
   request POST "/api/v1/matches/$1/submit?submittingPlayerId=$2" '{"sets":[{"setNumber":1,"scorePlayer1":11,"scorePlayer2":5},{"setNumber":2,"scorePlayer1":12,"scorePlayer2":10}]}'
   check "Match $1: player1 submits score" 200
   request PUT "/api/v1/matches/$1/confirm?actingPlayerId=$3"
@@ -75,9 +84,13 @@ play_scheduled() { # play every SCHEDULED match of the given stage in tournament
     IFS=, read -r MID P1 P2 <<< "$row"
     play_match "$MID" "$P1" "$P2"
   done
+  if [ "$MATCH_MODE" = "sql" ]; then
+    request POST "/api/v1/tournaments/$T/sync-results?actingPlayerId=$A"
+    check "sync-results reads the confirmed results through MatchService" 200
+  fi
 }
 
-echo "== PongRank integration test (run $RUN_ID) against $BASE_URL, database $DB_NAME"
+echo "== PongRank integration test (run $RUN_ID) against $BASE_URL, database $DB_NAME, match mode $MATCH_MODE"
 request GET /api/v1/clubs
 if [ -z "$STATUS" ] || [ "$STATUS" = "000" ]; then echo "The application is not reachable at $BASE_URL"; exit 1; fi
 
@@ -192,7 +205,8 @@ check "knockout blocked while group matches are pending -> 409" 409
 play_scheduled GROUP
 request GET "/api/v1/tournaments/$T/groups"
 check "group standings" 200
-assert_eq "groups completed automatically after Match confirmations (no sync)" "True" "$(echo "$BODY" | json "all(g['completed'] for g in d)")"
+if [ "$MATCH_MODE" = "sql" ]; then GROUP_LABEL="groups completed after sync-results"; else GROUP_LABEL="groups completed automatically after Match confirmations (no sync)"; fi
+assert_eq "$GROUP_LABEL" "True" "$(echo "$BODY" | json "all(g['completed'] for g in d)")"
 assert_eq "2 qualifiers per group" "4" "$(echo "$BODY" | json "sum(1 for g in d for r in g['standings'] if r['qualified'])")"
 request POST "/api/v1/tournaments/$T/sync-results?actingPlayerId=$A"
 check "manual sync is still available (no-op)" 200
