@@ -5,9 +5,9 @@ import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
-import org.example.pongrankbackend.TrainingSession.mapper.TrainingSessionMapper;
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,14 +19,14 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final PlayerRepository playerRepository;
-    private final TrainingSessionMapper trainingSessionMapper;
+    private final ModelMapper modelMapper;
 
     public TrainingSessionServiceImpl(TrainingSessionRepository trainingSessionRepository,
                                        PlayerRepository playerRepository,
-                                       TrainingSessionMapper trainingSessionMapper) {
+                                       ModelMapper modelMapper) {
         this.trainingSessionRepository = trainingSessionRepository;
         this.playerRepository = playerRepository;
-        this.trainingSessionMapper = trainingSessionMapper;
+        this.modelMapper = modelMapper;
     }
 
     @Override
@@ -39,14 +39,14 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
                 .map(TrainingSession::getPostureScore)
                 .orElse(null);
 
-        TrainingSession session = trainingSessionMapper.toEntity(dto);
+        TrainingSession session = modelMapper.map(dto, TrainingSession.class);
         session.setPlayer(player);
 
         TrainingSession savedSession = trainingSessionRepository.save(session);
 
         boolean isNewBest = previousBest == null || savedSession.getPostureScore() > previousBest;
 
-        TrainingSessionResponseDTO response = trainingSessionMapper.toDto(savedSession);
+        TrainingSessionResponseDTO response = modelMapper.map(savedSession, TrainingSessionResponseDTO.class);
         response.setNewPersonalBest(isNewBest);
         return response;
     }
@@ -59,7 +59,7 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
 
         List<TrainingSession> sessions = trainingSessionRepository.findByPlayerIdOrderByCreatedAtDesc(playerId);
         return sessions.stream()
-                .map(trainingSessionMapper::toDto)
+                .map(session -> modelMapper.map(session, TrainingSessionResponseDTO.class))
                 .toList();
     }
 }

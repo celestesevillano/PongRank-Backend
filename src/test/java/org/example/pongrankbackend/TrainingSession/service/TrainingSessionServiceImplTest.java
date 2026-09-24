@@ -5,7 +5,6 @@ import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
-import org.example.pongrankbackend.TrainingSession.mapper.TrainingSessionMapper;
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -15,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.modelmapper.ModelMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -35,7 +36,7 @@ class TrainingSessionServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
-    private TrainingSessionMapper trainingSessionMapper;
+    private ModelMapper modelMapper;
 
     @InjectMocks
     private TrainingSessionServiceImpl trainingSessionService;
@@ -69,9 +70,9 @@ class TrainingSessionServiceImplTest {
 
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
         when(trainingSessionRepository.findTopByPlayerIdOrderByPostureScoreDesc(playerId)).thenReturn(Optional.empty());
-        when(trainingSessionMapper.toEntity(dto)).thenReturn(mappedSession);
+        when(modelMapper.map(dto, TrainingSession.class)).thenReturn(mappedSession);
         when(trainingSessionRepository.save(any(TrainingSession.class))).thenReturn(savedSession);
-        when(trainingSessionMapper.toDto(savedSession)).thenReturn(responseDto);
+        when(modelMapper.map(savedSession, TrainingSessionResponseDTO.class)).thenReturn(responseDto);
 
         // Act
         TrainingSessionResponseDTO result = trainingSessionService.registerSession(playerId, dto);
@@ -161,8 +162,8 @@ class TrainingSessionServiceImplTest {
 
         when(playerRepository.existsById(playerId)).thenReturn(true);
         when(trainingSessionRepository.findByPlayerIdOrderByCreatedAtDesc(playerId)).thenReturn(List.of(newest, oldest));
-        when(trainingSessionMapper.toDto(newest)).thenReturn(newestDto);
-        when(trainingSessionMapper.toDto(oldest)).thenReturn(oldestDto);
+        when(modelMapper.map(newest, TrainingSessionResponseDTO.class)).thenReturn(newestDto);
+        when(modelMapper.map(oldest, TrainingSessionResponseDTO.class)).thenReturn(oldestDto);
 
         // Act
         List<TrainingSessionResponseDTO> result = trainingSessionService.getHistoryByPlayer(playerId);
@@ -204,8 +205,8 @@ class TrainingSessionServiceImplTest {
 
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
         when(trainingSessionRepository.findTopByPlayerIdOrderByPostureScoreDesc(playerId)).thenReturn(previousBest);
-        when(trainingSessionMapper.toEntity(any(TrainingSessionCreateDTO.class))).thenReturn(mappedSession);
+        when(modelMapper.map(any(TrainingSessionCreateDTO.class), eq(TrainingSession.class))).thenReturn(mappedSession);
         when(trainingSessionRepository.save(any(TrainingSession.class))).thenReturn(savedSession);
-        when(trainingSessionMapper.toDto(savedSession)).thenReturn(TrainingSessionResponseDTO.builder().id(10L).postureScore(postureScore).build());
+        when(modelMapper.map(savedSession, TrainingSessionResponseDTO.class)).thenReturn(TrainingSessionResponseDTO.builder().id(10L).postureScore(postureScore).build());
     }
 }
