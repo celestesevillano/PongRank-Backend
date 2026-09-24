@@ -8,12 +8,12 @@ import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.modelmapper.ModelMapper;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.NoSuchElementException;
 
 @Service
 @Transactional(readOnly = true)
@@ -37,8 +37,7 @@ public class PlayerServiceImpl implements PlayerService {
         String normalizedEmail = dto.getEmail().trim().toLowerCase();
 
         if (playerRepository.existsByEmail(normalizedEmail)) {
-            // TODO: Replace with custom EmailAlreadyExistsException
-            throw new IllegalArgumentException("El email '" + normalizedEmail + "' ya se encuentra registrado");
+            throw new EmailAlreadyExistsException("El email '" + normalizedEmail + "' ya se encuentra registrado");
         }
 
         Player player = modelMapper.map(dto, Player.class);
@@ -61,14 +60,14 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     public PlayerResponseDTO getPlayerById(Long id) {
         Player player = playerRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + id)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + id));
         return modelMapper.map(player, PlayerResponseDTO.class);
     }
 
     @Override
     public PlayerSummaryDTO getPlayerSummaryById(Long id) {
         Player player = playerRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + id)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + id));
         return modelMapper.map(player, PlayerSummaryDTO.class);
     }
 
@@ -76,7 +75,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Transactional
     public PlayerResponseDTO updatePlayer(Long playerId, PlayerUpdateRequestDTO dto) {
         Player player = playerRepository.findById(playerId)
-                .orElseThrow(() -> new NoSuchElementException("Jugador no encontrado con ID: " + playerId)); // TODO: Replace with custom ResourceNotFoundException
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
 
         modelMapper.map(dto, player);
 

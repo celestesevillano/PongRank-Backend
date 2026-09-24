@@ -8,6 +8,8 @@ import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -18,7 +20,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -120,7 +121,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.sendFriendRequest(senderId, dto))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Ya existe una relación de amistad");
 
         verify(friendshipRepository, never()).save(any());
@@ -138,7 +139,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.sendFriendRequest(senderId, dto))
-                .isInstanceOf(NoSuchElementException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Jugador emisor no encontrado");
 
         verify(friendshipRepository, never()).save(any());
@@ -158,7 +159,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.sendFriendRequest(senderId, dto))
-                .isInstanceOf(NoSuchElementException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Jugador receptor no encontrado");
 
         verify(friendshipRepository, never()).save(any());
