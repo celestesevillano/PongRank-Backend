@@ -4,7 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
-// PUT /api/v1/communities/{id} (E5)
 @Getter
 @Setter
 @NoArgsConstructor

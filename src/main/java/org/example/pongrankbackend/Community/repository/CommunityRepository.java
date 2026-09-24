@@ -16,24 +16,17 @@ import java.util.Optional;
 
 @Repository
 public interface CommunityRepository extends JpaRepository<Community, Long> {
-    //E1: validacion de nombre duplicado al crear comunidad, UTEC == utec
-    //Se incluye comunidades ARCHIVED,el nombre queda reservado para evitar suplantaciones
-    boolean existsByNameIgnoreCase(String name);
 
-    //E5: validacion del nombre duplicado al editar
+    boolean existsByNameIgnoreCase(String name);
     boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 
-    //E9, E10, E11: carga la comunidad bloquando su fila
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Community c WHERE c.id = :id")
     Optional<Community> findByIdForUpdate(@Param("id") Long id);
 
-    //E4: ficha de comunidad con el creador ya creado
     @Query("SELECT c FROM Community c JOIN FETCH c.creator WHERE c.id = :id")
     Optional<Community> findByIdWithCreator(@Param("id") Long id);
 
-    //E2: Búsqueda paginada con filtros opcionales
-    //
     @Query("""
             SELECT c FROM Community c
             WHERE c.status = :status

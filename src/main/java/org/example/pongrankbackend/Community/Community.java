@@ -16,10 +16,11 @@ import java.util.List;
 
 @Entity
 @Table(
-    name = "communities",
-    indexes = {
-        @Index(name = "idx_community_name", columnList = "name")
-    }
+        name = "communities",
+        indexes = {
+                @Index(name = "idx_community_name", columnList = "name"),
+                @Index(name = "idx_community_type_status", columnList = "community_type, status")
+        }
 )
 @Getter
 @Setter
@@ -46,13 +47,23 @@ public class Community {
     @Column(name = "community_type", nullable = false, length = 30)
     private CommunityType communityType;
 
+    // CAMBIOS: Habilita el borrado lógico
+    // Estado del ciclo de vida. Por defecto toda comunidad nace ACTIVE..
+    @NotNull
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private CommunityStatus status = CommunityStatus.ACTIVE;
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "creator_id", nullable = false)
     private Player creator;
 
+    // CAMBIOS: orphanRemoval = true eliminado
+    // Salir de la comunidad es un UPDATE de MembershipStatus
     @Builder.Default
-    @OneToMany(mappedBy = "community", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "community", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<CommunityMembership> memberships = new ArrayList<>();
 
     @Builder.Default
@@ -65,6 +76,10 @@ public class Community {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    //Cuando cierro la comunidad
+    @Column(name = "archived_at")
+    private LocalDateTime archivedAt;
 
     @PrePersist
     protected void onCreate() {
