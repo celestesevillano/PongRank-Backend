@@ -12,13 +12,15 @@ import org.example.pongrankbackend.Tournament.dto.TournamentWalkoverRequestDTO;
 import org.example.pongrankbackend.Tournament.service.TournamentService;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-// WARNING: actingPlayerId is sent by the client and is NOT secure authentication. Local testing only until JWT is integrated.
 @RestController
 @RequestMapping("/api/v1/tournaments")
 public class TournamentController {
@@ -29,12 +31,12 @@ public class TournamentController {
         this.tournamentService = tournamentService;
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentResponseDTO> createTournament(
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentCreateRequestDTO dto) {
-        TournamentResponseDTO response = tournamentService.createTournament(actingPlayerId, dto);
+        TournamentResponseDTO response = tournamentService.createTournament(currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -56,41 +58,41 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getParticipants(tournamentId));
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping("/{tournamentId}/participants")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentParticipantResponseDTO> addParticipant(
             @PathVariable Long tournamentId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentParticipantRequestDTO dto) {
-        TournamentParticipantResponseDTO response = tournamentService.addParticipant(tournamentId, actingPlayerId, dto);
+        TournamentParticipantResponseDTO response = tournamentService.addParticipant(tournamentId, currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @DeleteMapping("/{tournamentId}/participants/{playerId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> removeParticipant(
             @PathVariable Long tournamentId,
             @PathVariable Long playerId,
-            @RequestParam Long actingPlayerId) {
-        tournamentService.removeParticipant(tournamentId, playerId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        tournamentService.removeParticipant(tournamentId, playerId, currentUser.getId());
         return ResponseEntity.noContent().build();
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PutMapping("/{tournamentId}/seeding")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<TournamentParticipantResponseDTO>> updateSeeding(
             @PathVariable Long tournamentId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentOrderedPlayersRequestDTO dto) {
-        return ResponseEntity.ok(tournamentService.updateSeeding(tournamentId, actingPlayerId, dto));
+        return ResponseEntity.ok(tournamentService.updateSeeding(tournamentId, currentUser.getId(), dto));
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping("/{tournamentId}/start")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentResponseDTO> startTournament(
             @PathVariable Long tournamentId,
-            @RequestParam Long actingPlayerId) {
-        return ResponseEntity.ok(tournamentService.startTournament(tournamentId, actingPlayerId));
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        return ResponseEntity.ok(tournamentService.startTournament(tournamentId, currentUser.getId()));
     }
 
     @GetMapping("/{tournamentId}/matches")
@@ -103,40 +105,40 @@ public class TournamentController {
         return ResponseEntity.ok(tournamentService.getGroupStandings(tournamentId));
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PutMapping("/{tournamentId}/groups/{groupNumber}/tie-resolution")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<GroupStandingsResponseDTO>> resolveGroupTie(
             @PathVariable Long tournamentId,
             @PathVariable Integer groupNumber,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentOrderedPlayersRequestDTO dto) {
-        return ResponseEntity.ok(tournamentService.resolveGroupTie(tournamentId, groupNumber, actingPlayerId, dto));
+        return ResponseEntity.ok(tournamentService.resolveGroupTie(tournamentId, groupNumber, currentUser.getId(), dto));
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping("/{tournamentId}/knockout")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentResponseDTO> generateKnockout(
             @PathVariable Long tournamentId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestParam(defaultValue = "false") boolean allowSameGroupMatches) {
-        return ResponseEntity.ok(tournamentService.generateKnockout(tournamentId, actingPlayerId, allowSameGroupMatches));
+        return ResponseEntity.ok(tournamentService.generateKnockout(tournamentId, currentUser.getId(), allowSameGroupMatches));
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping("/{tournamentId}/matches/{tournamentMatchId}/walkover")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentMatchResponseDTO> declareWalkover(
             @PathVariable Long tournamentId,
             @PathVariable Long tournamentMatchId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentWalkoverRequestDTO dto) {
-        return ResponseEntity.ok(tournamentService.declareWalkover(tournamentId, tournamentMatchId, actingPlayerId, dto));
+        return ResponseEntity.ok(tournamentService.declareWalkover(tournamentId, tournamentMatchId, currentUser.getId(), dto));
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping("/{tournamentId}/sync-results")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentResponseDTO> syncMatchResults(
             @PathVariable Long tournamentId,
-            @RequestParam Long actingPlayerId) {
-        return ResponseEntity.ok(tournamentService.syncMatchResults(tournamentId, actingPlayerId));
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        return ResponseEntity.ok(tournamentService.syncMatchResults(tournamentId, currentUser.getId()));
     }
 }

@@ -6,12 +6,13 @@ import org.example.pongrankbackend.ClubMembership.dto.ClubMembershipResponseDTO;
 import org.example.pongrankbackend.ClubMembership.service.ClubMembershipService;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-
-// WARNING: actingPlayerId is sent by the client and is NOT secure authentication. Local testing only until JWT is integrated.
 @RestController
 @RequestMapping("/api/v1/club-memberships")
 public class ClubMembershipController {
@@ -22,23 +23,23 @@ public class ClubMembershipController {
         this.clubMembershipService = clubMembershipService;
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubMembershipResponseDTO> requestMembership(
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubMembershipRequestDTO dto) {
-        ClubMembershipResponseDTO response = clubMembershipService.requestMembership(actingPlayerId, dto);
+        ClubMembershipResponseDTO response = clubMembershipService.requestMembership(currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @GetMapping("/clubs/{clubId}/pending")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PageResponseDTO<ClubMembershipResponseDTO>> getPendingRequests(
             @PathVariable Long clubId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestParam(defaultValue = PageRequestFactory.DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = PageRequestFactory.DEFAULT_SIZE) int size) {
-        PageResponseDTO<ClubMembershipResponseDTO> response = clubMembershipService.getPendingRequests(clubId, actingPlayerId, page, size);
+        PageResponseDTO<ClubMembershipResponseDTO> response = clubMembershipService.getPendingRequests(clubId, currentUser.getId(), page, size);
         return ResponseEntity.ok(response);
     }
 
@@ -60,39 +61,39 @@ public class ClubMembershipController {
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{membershipId}/approve")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubMembershipResponseDTO> approveRequest(
             @PathVariable Long membershipId,
-            @RequestParam Long actingPlayerId) {
-        ClubMembershipResponseDTO response = clubMembershipService.approveRequest(membershipId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        ClubMembershipResponseDTO response = clubMembershipService.approveRequest(membershipId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{membershipId}/reject")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubMembershipResponseDTO> rejectRequest(
             @PathVariable Long membershipId,
-            @RequestParam Long actingPlayerId) {
-        ClubMembershipResponseDTO response = clubMembershipService.rejectRequest(membershipId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        ClubMembershipResponseDTO response = clubMembershipService.rejectRequest(membershipId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{membershipId}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubMembershipResponseDTO> cancelRequest(
             @PathVariable Long membershipId,
-            @RequestParam Long actingPlayerId) {
-        ClubMembershipResponseDTO response = clubMembershipService.cancelRequest(membershipId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        ClubMembershipResponseDTO response = clubMembershipService.cancelRequest(membershipId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{membershipId}/leave")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubMembershipResponseDTO> leaveClub(
             @PathVariable Long membershipId,
-            @RequestParam Long actingPlayerId) {
-        ClubMembershipResponseDTO response = clubMembershipService.leaveClub(membershipId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        ClubMembershipResponseDTO response = clubMembershipService.leaveClub(membershipId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 }

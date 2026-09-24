@@ -10,6 +10,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.example.pongrankbackend.security.CustomUserDetails;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -22,12 +25,12 @@ public class MatchController {
         this.matchService = matchService;
     }
 
-    // TODO: Extract creatorPlayerId from authenticated user via SecurityContext
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MatchResponseDTO> createMatch(
-            @RequestParam Long creatorPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody MatchCreateRequestDTO dto) {
-        MatchResponseDTO response = matchService.createMatch(creatorPlayerId, dto);
+        MatchResponseDTO response = matchService.createMatch(currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -72,41 +75,41 @@ public class MatchController {
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Extract submittingPlayerId from authenticated user via SecurityContext
     @PostMapping("/{matchId}/submit")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MatchDetailResponseDTO> submitScore(
             @PathVariable Long matchId,
-            @RequestParam Long submittingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody MatchScoreSubmitDTO dto) {
-        MatchDetailResponseDTO response = matchService.submitScore(matchId, submittingPlayerId, dto);
+        MatchDetailResponseDTO response = matchService.submitScore(matchId, currentUser.getId(), dto);
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Extract actingPlayerId from authenticated user via SecurityContext
     @PutMapping("/{matchId}/confirm")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MatchDetailResponseDTO> confirmMatch(
             @PathVariable Long matchId,
-            @RequestParam Long actingPlayerId) {
-        MatchDetailResponseDTO response = matchService.confirmMatch(matchId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        MatchDetailResponseDTO response = matchService.confirmMatch(matchId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Extract actingPlayerId from authenticated user via SecurityContext
     @PutMapping("/{matchId}/dispute")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MatchDetailResponseDTO> disputeMatch(
             @PathVariable Long matchId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody MatchDisputeRequestDTO dto) {
-        MatchDetailResponseDTO response = matchService.disputeMatch(matchId, actingPlayerId, dto);
+        MatchDetailResponseDTO response = matchService.disputeMatch(matchId, currentUser.getId(), dto);
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Extract actingPlayerId from authenticated user via SecurityContext
     @PutMapping("/{matchId}/cancel")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MatchResponseDTO> cancelMatch(
             @PathVariable Long matchId,
-            @RequestParam Long actingPlayerId) {
-        MatchResponseDTO response = matchService.cancelMatch(matchId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        MatchResponseDTO response = matchService.cancelMatch(matchId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 }

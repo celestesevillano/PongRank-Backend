@@ -11,12 +11,13 @@ import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
 import org.example.pongrankbackend.Club.service.ClubService;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-
-// WARNING: actingPlayerId is sent by the client and is NOT secure authentication. Local testing only until JWT is integrated.
 @RestController
 @RequestMapping("/api/v1/clubs")
 public class ClubController {
@@ -27,12 +28,12 @@ public class ClubController {
         this.clubService = clubService;
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> registerClub(
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubRegisterRequestDTO dto) {
-        ClubResponseDTO response = clubService.registerClub(actingPlayerId, dto);
+        ClubResponseDTO response = clubService.registerClub(currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -50,52 +51,52 @@ public class ClubController {
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{clubId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> updateClub(
             @PathVariable Long clubId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubUpdateRequestDTO dto) {
-        ClubResponseDTO response = clubService.updateClub(clubId, actingPlayerId, dto);
+        ClubResponseDTO response = clubService.updateClub(clubId, currentUser.getId(), dto);
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @GetMapping("/{clubId}/review")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubReviewResponseDTO> getClubReview(
             @PathVariable Long clubId,
-            @RequestParam Long actingPlayerId) {
-        ClubReviewResponseDTO response = clubService.getClubReview(clubId, actingPlayerId);
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        ClubReviewResponseDTO response = clubService.getClubReview(clubId, currentUser.getId());
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{clubId}/resubmit")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> resubmitClub(
             @PathVariable Long clubId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubResubmitRequestDTO dto) {
-        ClubResponseDTO response = clubService.resubmitClub(clubId, actingPlayerId, dto);
+        ClubResponseDTO response = clubService.resubmitClub(clubId, currentUser.getId(), dto);
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{clubId}/affiliation-document")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> replaceAffiliationDocument(
             @PathVariable Long clubId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubAffiliationDocumentRequestDTO dto) {
-        ClubResponseDTO response = clubService.replaceAffiliationDocument(clubId, actingPlayerId, dto);
+        ClubResponseDTO response = clubService.replaceAffiliationDocument(clubId, currentUser.getId(), dto);
         return ResponseEntity.ok(response);
     }
 
-    // TODO: Replace actingPlayerId @RequestParam with authenticated user from SecurityContext (JWT)
     @PatchMapping("/{clubId}/admin")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> transferAdministration(
             @PathVariable Long clubId,
-            @RequestParam Long actingPlayerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubAdminTransferRequestDTO dto) {
-        ClubResponseDTO response = clubService.transferAdministration(clubId, actingPlayerId, dto);
+        ClubResponseDTO response = clubService.transferAdministration(clubId, currentUser.getId(), dto);
         return ResponseEntity.ok(response);
     }
 }
