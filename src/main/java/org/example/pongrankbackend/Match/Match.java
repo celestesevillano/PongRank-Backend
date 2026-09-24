@@ -50,6 +50,11 @@ public class Match {
     @Builder.Default
     private MatchFormat format = MatchFormat.BO3;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "match_type", length = 20)
+    @Builder.Default
+    private MatchType matchType = MatchType.FRIEND;
+
     @Column(precision = 9, scale = 6)
     private BigDecimal latitude;
 
