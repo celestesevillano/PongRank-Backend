@@ -20,6 +20,8 @@ public interface CommunityRepository extends JpaRepository<Community, Long> {
     boolean existsByNameIgnoreCase(String name);
     boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 
+    long countByCreatorIdAndStatus(Long creatorId, CommunityStatus status);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT c FROM Community c WHERE c.id = :id")
     Optional<Community> findByIdForUpdate(@Param("id") Long id);

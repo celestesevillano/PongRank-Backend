@@ -13,6 +13,7 @@ import org.example.pongrankbackend.CommunityMembership.MembershipStatus;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberAddRequestDTO;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRoleUpdateDTO;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ApiException;
@@ -26,6 +27,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Optional;
 
@@ -55,6 +57,9 @@ class CommunityServiceImplTest {
     @Mock
     private ModelMapper modelMapper;
 
+    @Mock
+    private MembershipService membershipService;
+
     @InjectMocks
     private CommunityServiceImpl communityService;
 
@@ -63,6 +68,11 @@ class CommunityServiceImplTest {
 
     @BeforeEach
     void setUp() {
+        ReflectionTestUtils.setField(communityService, "maxCreatedFreemium", 1);
+        ReflectionTestUtils.setField(communityService, "maxCreatedPremium", 5);
+        ReflectionTestUtils.setField(communityService, "maxTotalFreemium", 2);
+        ReflectionTestUtils.setField(communityService, "maxTotalPremium", 7);
+
         creator = Player.builder()
                 .id(CREATOR_ID)
                 .name("Andres")
@@ -110,6 +120,20 @@ class CommunityServiceImplTest {
     private void givenRequesterIsAdmin(boolean isAdmin) {
         when(membershipRepository.existsByCommunityIdAndPlayerIdAndRoleAndStatus(
                 anyLong(), anyLong(), any(), any())).thenReturn(isAdmin);
+    }
+
+    private void givenIsPremium(boolean isPremium) {
+        when(membershipService.isPremiumMember(anyLong())).thenReturn(isPremium);
+    }
+
+    private void givenActiveCommunitiesCreated(long count) {
+        when(communityRepository.countByCreatorIdAndStatus(anyLong(), eq(CommunityStatus.ACTIVE)))
+                .thenReturn(count);
+    }
+
+    private void givenActiveMemberships(long count) {
+        when(membershipRepository.countByPlayerIdAndRoleAndStatus(
+                anyLong(), eq(CommunityRole.MEMBER), eq(MembershipStatus.ACTIVE))).thenReturn(count);
     }
 
     private void thenFailsWith(HttpStatus expected, Runnable action) {
@@ -297,6 +321,198 @@ class CommunityServiceImplTest {
                     () -> communityService.addMember(COMMUNITY_ID, dto, CREATOR_ID));
 
             verify(membershipRepository, never()).save(any());
+        }
+    }
+
+    // ---------- Regla 1: limite de creacion (EP1) ----------
+
+    @Nested
+    @DisplayName("Limite de creacion segun plan")
+    class CreationLimit {
+
+        private void givenSuccessfulCreationPath() {
+            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(false);
+            when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
+            when(communityRepository.save(any(Community.class))).thenReturn(community);
+            when(modelMapper.map(any(Community.class), eq(CommunityResponseDTO.class)))
+                    .thenReturn(new CommunityResponseDTO());
+        }
+
+        private void givenRejectedCreationPath() {
+            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(false);
+            when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
+        }
+
+        @Test
+        @DisplayName("freemium: permite crear justo debajo del limite (0 de 1)")
+        void freemium_JustBelowLimit_Allows() {
+            givenIsPremium(false);
+            givenActiveCommunitiesCreated(0L);
+            givenSuccessfulCreationPath();
+
+            communityService.createCommunity(createRequest(), CREATOR_ID);
+
+            verify(communityRepository).save(any(Community.class));
+        }
+
+        @Test
+        @DisplayName("freemium: rechaza justo en el limite (1 de 1)")
+        void freemium_AtLimit_Rejects() {
+            givenIsPremium(false);
+            givenActiveCommunitiesCreated(1L);
+            givenRejectedCreationPath();
+
+            thenFailsWith(HttpStatus.CONFLICT,
+                    () -> communityService.createCommunity(createRequest(), CREATOR_ID));
+
+            verify(communityRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("freemium: rechaza por encima del limite (2 de 1)")
+        void freemium_AboveLimit_Rejects() {
+            givenIsPremium(false);
+            givenActiveCommunitiesCreated(2L);
+            givenRejectedCreationPath();
+
+            thenFailsWith(HttpStatus.CONFLICT,
+                    () -> communityService.createCommunity(createRequest(), CREATOR_ID));
+
+            verify(communityRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("premium: permite crear justo debajo del limite (4 de 5)")
+        void premium_JustBelowLimit_Allows() {
+            givenIsPremium(true);
+            givenActiveCommunitiesCreated(4L);
+            givenSuccessfulCreationPath();
+
+            communityService.createCommunity(createRequest(), CREATOR_ID);
+
+            verify(communityRepository).save(any(Community.class));
+        }
+
+        @Test
+        @DisplayName("premium: rechaza justo en el limite (5 de 5)")
+        void premium_AtLimit_Rejects() {
+            givenIsPremium(true);
+            givenActiveCommunitiesCreated(5L);
+            givenRejectedCreationPath();
+
+            thenFailsWith(HttpStatus.CONFLICT,
+                    () -> communityService.createCommunity(createRequest(), CREATOR_ID));
+
+            verify(communityRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("premium: rechaza por encima del limite (6 de 5)")
+        void premium_AboveLimit_Rejects() {
+            givenIsPremium(true);
+            givenActiveCommunitiesCreated(6L);
+            givenRejectedCreationPath();
+
+            thenFailsWith(HttpStatus.CONFLICT,
+                    () -> communityService.createCommunity(createRequest(), CREATOR_ID));
+
+            verify(communityRepository, never()).save(any());
+        }
+    }
+
+    // ---------- Regla 2: limite total de pertenencia (EP9) ----------
+
+    @Nested
+    @DisplayName("Limite total de pertenencia segun plan")
+    class TotalMembershipLimit {
+
+        private void givenRejoinAllowed() {
+            CommunityMembership old = membership(CommunityRole.MEMBER, MembershipStatus.INACTIVE);
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            when(membershipRepository.findByCommunityIdAndPlayerId(COMMUNITY_ID, CREATOR_ID))
+                    .thenReturn(Optional.of(old));
+        }
+
+        private void givenJoinRejected() {
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
+        }
+
+        // freemium: max-total = 2 (creadas + member activo)
+
+        @Test
+        @DisplayName("freemium: permite unirse justo debajo del limite (1 de 2)")
+        void freemium_JustBelowLimit_Allows() {
+            givenIsPremium(false);
+            givenActiveCommunitiesCreated(0L);
+            givenActiveMemberships(1L);
+            givenRejoinAllowed();
+
+            communityService.addMember(COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID);
+
+            verify(membershipRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("freemium: rechaza justo en el limite (2 de 2)")
+        void freemium_AtLimit_Rejects() {
+            givenIsPremium(false);
+            givenActiveCommunitiesCreated(1L);
+            givenActiveMemberships(1L);
+            givenJoinRejected();
+
+            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+                    COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
+        }
+
+        @Test
+        @DisplayName("freemium: rechaza por encima del limite (3 de 2)")
+        void freemium_AboveLimit_Rejects() {
+            givenIsPremium(false);
+            givenActiveCommunitiesCreated(1L);
+            givenActiveMemberships(2L);
+            givenJoinRejected();
+
+            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+                    COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
+        }
+
+        // premium: max-total = 7 (creadas + member activo) - mismo ejemplo del enunciado: 5 creadas, hasta 2 mas
+
+        @Test
+        @DisplayName("premium: permite unirse justo debajo del limite (5 creadas + 1 = 6 de 7)")
+        void premium_JustBelowLimit_Allows() {
+            givenIsPremium(true);
+            givenActiveCommunitiesCreated(5L);
+            givenActiveMemberships(1L);
+            givenRejoinAllowed();
+
+            communityService.addMember(COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID);
+
+            verify(membershipRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("premium: rechaza justo en el limite (5 creadas + 2 = 7 de 7)")
+        void premium_AtLimit_Rejects() {
+            givenIsPremium(true);
+            givenActiveCommunitiesCreated(5L);
+            givenActiveMemberships(2L);
+            givenJoinRejected();
+
+            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+                    COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
+        }
+
+        @Test
+        @DisplayName("premium: rechaza por encima del limite (5 creadas + 3 = 8 de 7)")
+        void premium_AboveLimit_Rejects() {
+            givenIsPremium(true);
+            givenActiveCommunitiesCreated(5L);
+            givenActiveMemberships(3L);
+            givenJoinRejected();
+
+            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+                    COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
         }
     }
 
