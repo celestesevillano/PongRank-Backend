@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.TrainingSession.service;
 
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
@@ -7,6 +8,7 @@ import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +38,9 @@ class TrainingSessionServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
+    private MembershipService membershipService;
+
+    @Mock
     private ModelMapper modelMapper;
 
     @InjectMocks
@@ -48,6 +53,7 @@ class TrainingSessionServiceImplTest {
         Long playerId = 1L;
         Player player = Player.builder().id(playerId).name("Jugador A").build();
         TrainingSessionCreateDTO dto = buildCreateDto(80.0);
+        when(membershipService.hasCoachAccess(playerId)).thenReturn(true);
 
         TrainingSession mappedSession = TrainingSession.builder()
                 .swingVelocityMax(dto.getSwingVelocityMax())
@@ -103,6 +109,25 @@ class TrainingSessionServiceImplTest {
         assertThatThrownBy(() -> trainingSessionService.registerSession(playerId, dto))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Jugador no encontrado");
+
+        verify(trainingSessionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("registerSession: lanza UnauthorizedActionException cuando el jugador no tiene acceso al Coach (solo PRO/ENTERPRISE)")
+    void registerSession_NoCoachAccess_ThrowsException() {
+        // Arrange
+        Long playerId = 1L;
+        Player player = Player.builder().id(playerId).build();
+        TrainingSessionCreateDTO dto = buildCreateDto(80.0);
+
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
+        when(membershipService.hasCoachAccess(playerId)).thenReturn(false);
+
+        // Act & Assert
+        assertThatThrownBy(() -> trainingSessionService.registerSession(playerId, dto))
+                .isInstanceOf(UnauthorizedActionException.class)
+                .hasMessageContaining("PRO o ENTERPRISE");
 
         verify(trainingSessionRepository, never()).save(any());
     }
@@ -204,6 +229,7 @@ class TrainingSessionServiceImplTest {
         TrainingSession savedSession = TrainingSession.builder().id(10L).player(player).postureScore(postureScore).build();
 
         when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
+        when(membershipService.hasCoachAccess(playerId)).thenReturn(true);
         when(trainingSessionRepository.findTopByPlayerIdOrderByPostureScoreDesc(playerId)).thenReturn(previousBest);
         when(modelMapper.map(any(TrainingSessionCreateDTO.class), eq(TrainingSession.class))).thenReturn(mappedSession);
         when(trainingSessionRepository.save(any(TrainingSession.class))).thenReturn(savedSession);
