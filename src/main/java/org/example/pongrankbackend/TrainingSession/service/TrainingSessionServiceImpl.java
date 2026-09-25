@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.TrainingSession.service;
 
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
@@ -7,6 +8,7 @@ import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,13 +23,16 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
 
     private final TrainingSessionRepository trainingSessionRepository;
     private final PlayerRepository playerRepository;
+    private final MembershipService membershipService;
     private final ModelMapper modelMapper;
 
     public TrainingSessionServiceImpl(TrainingSessionRepository trainingSessionRepository,
                                        PlayerRepository playerRepository,
+                                       MembershipService membershipService,
                                        ModelMapper modelMapper) {
         this.trainingSessionRepository = trainingSessionRepository;
         this.playerRepository = playerRepository;
+        this.membershipService = membershipService;
         this.modelMapper = modelMapper;
     }
 
@@ -36,6 +41,10 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
     public TrainingSessionResponseDTO registerSession(Long playerId, TrainingSessionCreateDTO dto) {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
+
+        if (!membershipService.hasCoachAccess(playerId)) {
+            throw new UnauthorizedActionException("Solo los jugadores con plan PRO o ENTERPRISE pueden usar el Coach");
+        }
 
         Double previousBest = trainingSessionRepository.findTopByPlayerIdOrderByPostureScoreDesc(playerId)
                 .map(TrainingSession::getPostureScore)
