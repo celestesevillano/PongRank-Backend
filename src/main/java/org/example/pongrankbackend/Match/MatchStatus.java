@@ -6,5 +6,6 @@ public enum MatchStatus {
     PROPOSED_P2,
     CONFIRMED,
     DISPUTED,
-    CANCELLED
+    CANCELLED,
+    WALKOVER
 }

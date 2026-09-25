@@ -239,6 +239,9 @@ public class MatchServiceImpl implements MatchService {
         if (match.getStatus() == MatchStatus.CANCELLED) {
             throw new InvalidMatchStateException("El partido está cancelado. No se puede reportar marcador.");
         }
+        if (match.getStatus() == MatchStatus.WALKOVER) {
+            throw new InvalidMatchStateException("El partido fue cerrado por incomparecencia (W.O.). No se puede reportar marcador.");
+        }
 
         // Anti-trampa 3: Reglas de juego ITTF (sets a 11, ventaja de 2, deuce, formato BO3/BO5/BO7 y corte inmediato)
         MatchRuleValidator.MatchValidationResult validationResult =
@@ -291,6 +294,9 @@ public class MatchServiceImpl implements MatchService {
         if (match.getStatus() == MatchStatus.CANCELLED) {
             throw new InvalidMatchStateException("El partido se encuentra cancelado");
         }
+        if (match.getStatus() == MatchStatus.WALKOVER) {
+            throw new InvalidMatchStateException("El partido fue cerrado por incomparecencia (W.O.)");
+        }
 
         // Anti-auto-aprobación: El proponente NO puede auto-confirmarse su marcador
         if (match.getStatus() == MatchStatus.PROPOSED_P1) {
@@ -309,19 +315,20 @@ public class MatchServiceImpl implements MatchService {
             }
         }
 
-        // Sellar partido como CONFIRMED
-        match.setStatus(MatchStatus.CONFIRMED);
-        match.setConfirmedAt(LocalDateTime.now());
-        Match savedMatch = matchRepository.save(match);
-
         // Determinar ganador para el cálculo Glicko-2
-        long setsWonP1 = savedMatch.getSets().stream()
+        long setsWonP1 = match.getSets().stream()
                 .filter(s -> s.getScorePlayer1() > s.getScorePlayer2())
                 .count();
-        long setsWonP2 = savedMatch.getSets().stream()
+        long setsWonP2 = match.getSets().stream()
                 .filter(s -> s.getScorePlayer2() > s.getScorePlayer1())
                 .count();
         boolean p1Won = setsWonP1 > setsWonP2;
+
+        // Sellar partido como CONFIRMED
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setWinner(p1Won ? match.getPlayer1() : match.getPlayer2());
+        match.setConfirmedAt(LocalDateTime.now());
+        Match savedMatch = matchRepository.save(match);
 
         // Disparar evento asíncrono para recálculo de rating Glicko-2 sin retrasar la respuesta REST
         eventPublisher.publishEvent(new MatchConfirmedEvent(this, savedMatch.getId(), p1Won));
@@ -380,10 +387,52 @@ public class MatchServiceImpl implements MatchService {
         if (match.getStatus() == MatchStatus.CONFIRMED) {
             throw new InvalidMatchStateException("No se puede cancelar un partido que ya ha sido confirmado");
         }
+        if (match.getStatus() == MatchStatus.WALKOVER) {
+            throw new InvalidMatchStateException("No se puede cancelar un partido cerrado por incomparecencia (W.O.)");
+        }
 
         match.setStatus(MatchStatus.CANCELLED);
         Match savedMatch = matchRepository.save(match);
         return toResponseDTO(savedMatch);
+    }
+
+    @Override
+    @Transactional
+    public MatchResponseDTO closeMatchAsWalkover(Long matchId, Long winnerId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
+
+        if (match.getStatus() == MatchStatus.CONFIRMED) {
+            throw new InvalidMatchStateException("El partido ya fue confirmado y cerrado previamente");
+        }
+        if (match.getStatus() == MatchStatus.CANCELLED) {
+            throw new InvalidMatchStateException("El partido se encuentra cancelado");
+        }
+        if (match.getStatus() == MatchStatus.WALKOVER) {
+            throw new InvalidMatchStateException("El partido ya fue cerrado por W.O.");
+        }
+
+        Player winner = null;
+        if (winnerId != null) {
+            boolean isP1 = match.getPlayer1().getId().equals(winnerId);
+            boolean isP2 = match.getPlayer2() != null && match.getPlayer2().getId().equals(winnerId);
+            if (!isP1 && !isP2) {
+                throw new InvalidMatchStateException("El jugador ganador indicado no participa en este partido");
+            }
+            winner = playerRepository.findById(winnerId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Jugador ganador no encontrado con ID: " + winnerId));
+        }
+
+        match.setStatus(MatchStatus.WALKOVER);
+        match.setWinner(winner);
+        match.setConfirmedAt(LocalDateTime.now());
+
+        Match savedMatch = matchRepository.save(match);
+        MatchResponseDTO responseDTO = toResponseDTO(savedMatch);
+
+        webSocketNotifier.notifyMatchConfirmed(savedMatch.getId(), responseDTO);
+
+        return responseDTO;
     }
 
     private MatchResponseDTO toResponseDTO(Match match) {
@@ -399,13 +448,19 @@ public class MatchServiceImpl implements MatchService {
         String scoreSummary = null;
         Long winnerId = null;
 
+        if (match.getWinner() != null) {
+            winnerId = match.getWinner().getId();
+        }
+
         if (match.getSets() != null && !match.getSets().isEmpty()) {
             long w1 = match.getSets().stream().filter(s -> s.getScorePlayer1() > s.getScorePlayer2()).count();
             long w2 = match.getSets().stream().filter(s -> s.getScorePlayer2() > s.getScorePlayer1()).count();
             scoreSummary = w1 + " - " + w2;
-            if (match.getStatus() == MatchStatus.CONFIRMED && match.getPlayer2() != null) {
+            if (winnerId == null && match.getStatus() == MatchStatus.CONFIRMED && match.getPlayer2() != null) {
                 winnerId = w1 > w2 ? match.getPlayer1().getId() : match.getPlayer2().getId();
             }
+        } else if (match.getStatus() == MatchStatus.WALKOVER) {
+            scoreSummary = "W.O.";
         }
 
         return MatchResponseDTO.builder()

@@ -84,4 +84,13 @@ public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort 
         MatchStatus status = matchService.getMatchById(match.getId()).getStatus();
         return status != MatchStatus.CREATED && status != MatchStatus.CANCELLED;
     }
+
+    @Override
+    public void closeAsWalkover(Match match, Player winner) {
+        if (match == null || match.getId() == null) {
+            return;
+        }
+        Long winnerId = winner != null ? winner.getId() : null;
+        matchService.closeMatchAsWalkover(match.getId(), winnerId);
+    }
 }

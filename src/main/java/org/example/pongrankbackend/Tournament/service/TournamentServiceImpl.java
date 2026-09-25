@@ -445,6 +445,10 @@ public class TournamentServiceImpl implements TournamentService {
         match.setWinner(player1Absent ? match.getPlayer2() : match.getPlayer1());
         match.setStatus(TournamentMatchStatus.WALKOVER);
 
+        if (match.getMatch() != null) {
+            matchIntegrationPort.closeAsWalkover(match.getMatch(), match.getWinner());
+        }
+
         afterMatchFinished(tournament, match);
         return toMatchResponse(tournamentMatchRepository.save(match));
     }
