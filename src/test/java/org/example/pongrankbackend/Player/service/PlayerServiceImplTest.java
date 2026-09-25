@@ -8,24 +8,23 @@ import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
+import org.example.pongrankbackend.auth.service.AuthService;
 import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,45 +37,19 @@ class PlayerServiceImplTest {
     private ModelMapper modelMapper;
 
     @Mock
-    private PasswordEncoder passwordEncoder;
+    private AuthService authService;
 
     @InjectMocks
     private PlayerServiceImpl playerService;
 
     @Test
-    @DisplayName("registerPlayer: registra un jugador exitosamente con email normalizado, password codificado y valores por defecto")
+    @DisplayName("registerPlayer: delega en authService.register y retorna el PlayerResponseDTO")
     void registerPlayer_Successful() {
         // Arrange
         PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
                 .name("Carlos Gomez")
-                .email("  CARLOS.GOMEZ@Domain.COM  ")
-                .password("Password123")
-                .whatsapp("999111222")
-                .shareContact(null)
-                .categoryFdptm("Primera")
-                .federatedDeclared(null)
-                .build();
-
-        Player mappedPlayer = Player.builder()
-                .name("Carlos Gomez")
-                .email("  CARLOS.GOMEZ@Domain.COM  ")
-                .password("Password123")
-                .whatsapp("999111222")
-                .categoryFdptm("Primera")
-                .build();
-
-        Player savedPlayer = Player.builder()
-                .id(1L)
-                .name("Carlos Gomez")
                 .email("carlos.gomez@domain.com")
-                .password("encoded_Password123")
-                .role(Role.ROLE_USER)
-                .status(PlayerStatus.ACTIVE)
-                .shareContact(false)
-                .federatedDeclared(false)
-                .ratingGlicko(1500.0)
-                .ratingDeviation(350.0)
-                .volatility(0.06)
+                .password("Password123")
                 .build();
 
         PlayerResponseDTO expectedResponse = PlayerResponseDTO.builder()
@@ -85,15 +58,15 @@ class PlayerServiceImplTest {
                 .email("carlos.gomez@domain.com")
                 .role(Role.ROLE_USER)
                 .status(PlayerStatus.ACTIVE)
-                .shareContact(false)
-                .federatedDeclared(false)
                 .build();
 
-        when(playerRepository.existsByEmail("carlos.gomez@domain.com")).thenReturn(false);
-        when(modelMapper.map(dto, Player.class)).thenReturn(mappedPlayer);
-        when(passwordEncoder.encode("Password123")).thenReturn("encoded_Password123");
-        when(playerRepository.save(any(Player.class))).thenReturn(savedPlayer);
-        when(modelMapper.map(savedPlayer, PlayerResponseDTO.class)).thenReturn(expectedResponse);
+        AuthResponseDTO authResponse = AuthResponseDTO.builder()
+                .token("access_token")
+                .refreshToken("refresh_token")
+                .player(expectedResponse)
+                .build();
+
+        when(authService.register(dto)).thenReturn(authResponse);
 
         // Act
         PlayerResponseDTO actualResponse = playerService.registerPlayer(dto);
@@ -102,25 +75,11 @@ class PlayerServiceImplTest {
         assertThat(actualResponse).isNotNull();
         assertThat(actualResponse.getId()).isEqualTo(1L);
         assertThat(actualResponse.getEmail()).isEqualTo("carlos.gomez@domain.com");
-
-        ArgumentCaptor<Player> playerCaptor = ArgumentCaptor.forClass(Player.class);
-        verify(playerRepository).save(playerCaptor.capture());
-        Player playerToSave = playerCaptor.getValue();
-
-        assertThat(playerToSave.getEmail()).isEqualTo("carlos.gomez@domain.com");
-        assertThat(playerToSave.getPassword()).isEqualTo("encoded_Password123");
-        assertThat(playerToSave.getPassword()).isNotEqualTo("Password123");
-        assertThat(playerToSave.getRole()).isEqualTo(Role.ROLE_USER);
-        assertThat(playerToSave.getStatus()).isEqualTo(PlayerStatus.ACTIVE);
-        assertThat(playerToSave.getShareContact()).isFalse();
-        assertThat(playerToSave.getFederatedDeclared()).isFalse();
-
-        verify(passwordEncoder).encode("Password123");
-        verify(playerRepository).existsByEmail("carlos.gomez@domain.com");
+        verify(authService).register(dto);
     }
 
     @Test
-    @DisplayName("registerPlayer: lanza excepción cuando el email ya existe y no guarda en repository")
+    @DisplayName("registerPlayer: propaga excepción cuando el email ya existe en authService")
     void registerPlayer_DuplicateEmail_ThrowsException() {
         // Arrange
         PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
@@ -129,15 +88,15 @@ class PlayerServiceImplTest {
                 .password("Password123")
                 .build();
 
-        when(playerRepository.existsByEmail("carlos.gomez@domain.com")).thenReturn(true);
+        when(authService.register(dto))
+                .thenThrow(new EmailAlreadyExistsException("El email 'carlos.gomez@domain.com' ya se encuentra registrado"));
 
         // Act & Assert
         assertThatThrownBy(() -> playerService.registerPlayer(dto))
                 .isInstanceOf(EmailAlreadyExistsException.class)
                 .hasMessageContaining("ya se encuentra registrado");
 
-        verify(playerRepository, never()).save(any());
-        verify(passwordEncoder, never()).encode(anyString());
+        verify(authService).register(dto);
     }
 
     @Test
