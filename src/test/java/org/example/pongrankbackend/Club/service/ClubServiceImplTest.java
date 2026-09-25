@@ -12,6 +12,7 @@ import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
 import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.Club.repository.ClubReviewRepository;
 import org.example.pongrankbackend.ClubMembership.service.ClubMembershipService;
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
@@ -62,6 +63,9 @@ class ClubServiceImplTest {
     private ClubMembershipService clubMembershipService;
 
     @Mock
+    private MembershipService membershipService;
+
+    @Mock
     private ModelMapper modelMapper;
 
     @InjectMocks
@@ -93,6 +97,7 @@ class ClubServiceImplTest {
                 .build();
 
         when(playerRepository.findById(ADMIN_ID)).thenReturn(Optional.of(requester));
+        when(membershipService.canCreateClub(ADMIN_ID)).thenReturn(true);
         when(clubRepository.save(any(Club.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         clubService.registerClub(ADMIN_ID, dto);
@@ -113,11 +118,28 @@ class ClubServiceImplTest {
                 .name("Club Lima").address("Av. Lima 123").affiliationDocumentUrl("https://docs.test/a.pdf").build();
 
         when(playerRepository.findById(ADMIN_ID)).thenReturn(Optional.of(player(ADMIN_ID, Role.ROLE_USER)));
+        when(membershipService.canCreateClub(ADMIN_ID)).thenReturn(true);
         when(clubRepository.existsByNameIgnoreCase("Club Lima")).thenReturn(true);
 
         assertThatThrownBy(() -> clubService.registerClub(ADMIN_ID, dto))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Ya existe un club");
+
+        verify(clubRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("registerClub: rechaza al solicitante que no tiene plan ENTERPRISE")
+    void registerClub_NotEnterprisePlan_ThrowsException() {
+        ClubRegisterRequestDTO dto = ClubRegisterRequestDTO.builder()
+                .name("Club Lima").address("Av. Lima 123").affiliationDocumentUrl("https://docs.test/a.pdf").build();
+
+        when(playerRepository.findById(ADMIN_ID)).thenReturn(Optional.of(player(ADMIN_ID, Role.ROLE_USER)));
+        when(membershipService.canCreateClub(ADMIN_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> clubService.registerClub(ADMIN_ID, dto))
+                .isInstanceOf(UnauthorizedActionException.class)
+                .hasMessageContaining("ENTERPRISE");
 
         verify(clubRepository, never()).save(any());
     }
