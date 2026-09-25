@@ -28,6 +28,10 @@ public interface CommunityMembershipRepository extends JpaRepository<CommunityMe
 
     long countByCommunityIdAndStatus(Long communityId, MembershipStatus status);
 
+    // rol MEMBER a propósito: la membership del creador es COMMUNITY_ADMIN, así que esto no duplica
+    // el conteo de comunidades creadas al calcular el total de pertenencia (creadas + unido como member)
+    long countByPlayerIdAndRoleAndStatus(Long playerId, CommunityRole role, MembershipStatus status);
+
     @Query(value = """
             SELECT m FROM CommunityMembership m
             JOIN FETCH m.player

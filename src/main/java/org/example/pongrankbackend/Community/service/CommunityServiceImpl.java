@@ -16,6 +16,7 @@ import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRespon
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRoleUpdateDTO;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityRankingEntryDTO;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.CommunityMembershipException;
@@ -23,6 +24,7 @@ import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -45,15 +47,30 @@ public class CommunityServiceImpl implements CommunityService {
     private final CommunityMembershipRepository membershipRepository;
     private final PlayerRepository playerRepository;
     private final ModelMapper modelMapper;
+    private final MembershipService membershipService;
+
+    @Value("${community.max-created.freemium}")
+    private int maxCreatedFreemium;
+
+    @Value("${community.max-created.premium}")
+    private int maxCreatedPremium;
+
+    @Value("${community.max-total.freemium}")
+    private int maxTotalFreemium;
+
+    @Value("${community.max-total.premium}")
+    private int maxTotalPremium;
 
     public CommunityServiceImpl(CommunityRepository communityRepository,
                                 CommunityMembershipRepository membershipRepository,
                                 PlayerRepository playerRepository,
-                                ModelMapper modelMapper) {
+                                ModelMapper modelMapper,
+                                MembershipService membershipService) {
         this.communityRepository = communityRepository;
         this.membershipRepository = membershipRepository;
         this.playerRepository = playerRepository;
         this.modelMapper = modelMapper;
+        this.membershipService = membershipService;
     }
 
     @Override
@@ -66,6 +83,7 @@ public class CommunityServiceImpl implements CommunityService {
         }
 
         Player creator = loadPlayer(requesterId);
+        verifyCreationLimit(requesterId);
         Community community = buildCommunity(dto, name, creator);
 
         try {
@@ -190,6 +208,7 @@ public class CommunityServiceImpl implements CommunityService {
         verifyCommunityIsActive(community);
 
         Long targetId = resolveTargetPlayer(communityId, dto, requesterId);
+        verifyTotalMembershipLimit(targetId);
 
         return membershipRepository.findByCommunityIdAndPlayerId(communityId, targetId)
                 .map(this::reactivateMembership)
@@ -283,6 +302,32 @@ public class CommunityServiceImpl implements CommunityService {
         if (!isAdmin) {
             throw new UnauthorizedActionException(
                     "Only community administrators can perform this action");
+        }
+    }
+
+    private void verifyCreationLimit(Long playerId) {
+        boolean isPremium = membershipService.isPremiumMember(playerId);
+        int limit = isPremium ? maxCreatedPremium : maxCreatedFreemium;
+
+        long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
+
+        if (createdActive >= limit) {
+            throw new CommunityMembershipException(
+                    "Player " + playerId + " reached the maximum of " + limit + " active communities created for their plan");
+        }
+    }
+
+    private void verifyTotalMembershipLimit(Long playerId) {
+        boolean isPremium = membershipService.isPremiumMember(playerId);
+        int limit = isPremium ? maxTotalPremium : maxTotalFreemium;
+
+        long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
+        long activeMemberships = membershipRepository.countByPlayerIdAndRoleAndStatus(
+                playerId, CommunityRole.MEMBER, MembershipStatus.ACTIVE);
+
+        if (createdActive + activeMemberships >= limit) {
+            throw new CommunityMembershipException(
+                    "Player " + playerId + " reached the maximum of " + limit + " total communities for their plan");
         }
     }
 
