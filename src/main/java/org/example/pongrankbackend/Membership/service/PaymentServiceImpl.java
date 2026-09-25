@@ -35,8 +35,14 @@ public class PaymentServiceImpl implements PaymentService {
     @Value("${mercadopago.webhook-url}")
     private String webhookUrl;
 
-    @Value("${membership.premium.price}")
-    private BigDecimal premiumPrice;
+    @Value("${membership.basic.price}")
+    private BigDecimal basicPrice;
+
+    @Value("${membership.pro.price}")
+    private BigDecimal proPrice;
+
+    @Value("${membership.enterprise.price}")
+    private BigDecimal enterprisePrice;
 
     public PaymentServiceImpl(MembershipService membershipService,
                                PaymentTransactionRepository paymentTransactionRepository) {
@@ -48,7 +54,7 @@ public class PaymentServiceImpl implements PaymentService {
     @Transactional
     public CreatePreferenceResponseDTO createPaymentPreference(Long playerId, MembershipPlan plan) {
         // FREEMIUM no cobra nada, no tiene sentido mandarlo a MercadoPago
-        if (plan != MembershipPlan.PREMIUM) {
+        if (plan == MembershipPlan.FREEMIUM) {
             throw new PaymentProcessingException("El plan FREEMIUM no requiere generar un pago");
         }
 
@@ -58,7 +64,7 @@ public class PaymentServiceImpl implements PaymentService {
                 PaymentTransaction.builder()
                         .membership(membership)
                         .status(PaymentStatus.PENDING)
-                        .amount(premiumPrice)
+                        .amount(priceFor(plan))
                         .build()
         );
 
@@ -69,6 +75,15 @@ public class PaymentServiceImpl implements PaymentService {
                 .initPoint(preference.getInitPoint())
                 .preferenceId(preference.getId())
                 .build();
+    }
+
+    private BigDecimal priceFor(MembershipPlan plan) {
+        return switch (plan) {
+            case BASIC -> basicPrice;
+            case PRO -> proPrice;
+            case ENTERPRISE -> enterprisePrice;
+            case FREEMIUM -> throw new PaymentProcessingException("El plan FREEMIUM no requiere generar un pago");
+        };
     }
 
     private Preference createPreferenceInMercadoPago(PaymentTransaction transaction, MembershipPlan plan) {
@@ -112,7 +127,7 @@ public class PaymentServiceImpl implements PaymentService {
         paymentTransactionRepository.save(transaction);
 
         if (transaction.getStatus() == PaymentStatus.APPROVED) {
-            membershipService.activatePremiumMembership(transaction.getMembership());
+            membershipService.activatePaidMembership(transaction.getMembership());
         }
     }
 

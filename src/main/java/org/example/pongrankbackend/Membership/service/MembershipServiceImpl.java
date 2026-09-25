@@ -12,12 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @Transactional(readOnly = true)
 public class MembershipServiceImpl implements MembershipService {
 
-    private static final int PREMIUM_DURATION_DAYS = 30;
+    private static final int PAID_PLAN_DURATION_DAYS = 30;
 
     private final MembershipRepository membershipRepository;
     private final PlayerRepository playerRepository;
@@ -28,11 +29,31 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
-    public boolean isPremiumMember(Long playerId) {
+    public MembershipPlan getActivePlan(Long playerId) {
+        return activeMembership(playerId)
+                .map(Membership::getPlan)
+                .orElse(MembershipPlan.FREEMIUM);
+    }
+
+    @Override
+    public boolean isPaidMember(Long playerId) {
+        return getActivePlan(playerId) != MembershipPlan.FREEMIUM;
+    }
+
+    @Override
+    public boolean hasCoachAccess(Long playerId) {
+        MembershipPlan plan = getActivePlan(playerId);
+        return plan == MembershipPlan.PRO || plan == MembershipPlan.ENTERPRISE;
+    }
+
+    @Override
+    public boolean canCreateClub(Long playerId) {
+        return getActivePlan(playerId) == MembershipPlan.ENTERPRISE;
+    }
+
+    private Optional<Membership> activeMembership(Long playerId) {
         return membershipRepository.findByPlayerIdAndStatus(playerId, MembershipStatus.ACTIVE)
-                .filter(membership -> membership.getPlan() == MembershipPlan.PREMIUM)
-                .filter(membership -> membership.getEndDate() == null || membership.getEndDate().isAfter(LocalDateTime.now()))
-                .isPresent();
+                .filter(membership -> membership.getEndDate() == null || membership.getEndDate().isAfter(LocalDateTime.now()));
     }
 
     @Override
@@ -57,10 +78,10 @@ public class MembershipServiceImpl implements MembershipService {
 
     @Override
     @Transactional
-    public void activatePremiumMembership(Membership membership) {
+    public void activatePaidMembership(Membership membership) {
         membership.setStatus(MembershipStatus.ACTIVE);
         membership.setStartDate(LocalDateTime.now());
-        membership.setEndDate(LocalDateTime.now().plusDays(PREMIUM_DURATION_DAYS));
+        membership.setEndDate(LocalDateTime.now().plusDays(PAID_PLAN_DURATION_DAYS));
         membershipRepository.save(membership);
     }
 

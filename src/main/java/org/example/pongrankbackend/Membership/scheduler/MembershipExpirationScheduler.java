@@ -6,7 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-// activatePremiumMembership fija el endDate pero nada lo revisa después; sin esto una membresía
+// activatePaidMembership fija el endDate pero nada lo revisa después; sin esto una membresía
 // vencida se queda en ACTIVE para siempre en la base. Corre una vez al día, de madrugada.
 @Component
 public class MembershipExpirationScheduler {

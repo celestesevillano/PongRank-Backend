@@ -42,7 +42,7 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class PaymentServiceImplTest {
 
-    private static final BigDecimal PREMIUM_PRICE = new BigDecimal("19.90");
+    private static final BigDecimal PRO_PRICE = new BigDecimal("19.90");
     private static final String WEBHOOK_URL = "http://localhost:8080/api/v1/payments/webhook";
 
     @Mock
@@ -57,7 +57,7 @@ class PaymentServiceImplTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(paymentService, "webhookUrl", WEBHOOK_URL);
-        ReflectionTestUtils.setField(paymentService, "premiumPrice", PREMIUM_PRICE);
+        ReflectionTestUtils.setField(paymentService, "proPrice", PRO_PRICE);
     }
 
     // ----- createPaymentPreference -----
@@ -75,8 +75,8 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("createPaymentPreference: crea la transacción PENDING y devuelve el initPoint de MercadoPago")
     void createPaymentPreference_Premium_ReturnsInitPoint() throws MPException, MPApiException {
-        Membership membership = Membership.builder().id(3L).plan(MembershipPlan.PREMIUM).status(MembershipStatus.PENDING).build();
-        when(membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PREMIUM)).thenReturn(membership);
+        Membership membership = Membership.builder().id(3L).plan(MembershipPlan.PRO).status(MembershipStatus.PENDING).build();
+        when(membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PRO)).thenReturn(membership);
         when(paymentTransactionRepository.save(any(PaymentTransaction.class)))
                 .thenAnswer(invocation -> {
                     PaymentTransaction transaction = invocation.getArgument(0);
@@ -95,7 +95,7 @@ class PaymentServiceImplTest {
                 throw new RuntimeException(e);
             }
         })) {
-            CreatePreferenceResponseDTO response = paymentService.createPaymentPreference(1L, MembershipPlan.PREMIUM);
+            CreatePreferenceResponseDTO response = paymentService.createPaymentPreference(1L, MembershipPlan.PRO);
 
             assertThat(response.getInitPoint()).isEqualTo("https://mercadopago.com/checkout/pref-123");
             assertThat(response.getPreferenceId()).isEqualTo("pref-123");
@@ -109,15 +109,15 @@ class PaymentServiceImplTest {
             assertThat(request.getExternalReference()).isEqualTo("42");
             assertThat(request.getNotificationUrl()).isEqualTo(WEBHOOK_URL);
             assertThat(request.getItems()).hasSize(1);
-            assertThat(request.getItems().get(0).getUnitPrice()).isEqualTo(PREMIUM_PRICE);
+            assertThat(request.getItems().get(0).getUnitPrice()).isEqualTo(PRO_PRICE);
         }
     }
 
     @Test
     @DisplayName("createPaymentPreference: envuelve un error de MercadoPago en PaymentProcessingException")
     void createPaymentPreference_MercadoPagoFails_WrapsInPaymentProcessingException() throws MPException, MPApiException {
-        Membership membership = Membership.builder().id(3L).plan(MembershipPlan.PREMIUM).status(MembershipStatus.PENDING).build();
-        when(membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PREMIUM)).thenReturn(membership);
+        Membership membership = Membership.builder().id(3L).plan(MembershipPlan.PRO).status(MembershipStatus.PENDING).build();
+        when(membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PRO)).thenReturn(membership);
         when(paymentTransactionRepository.save(any(PaymentTransaction.class)))
                 .thenAnswer(invocation -> {
                     PaymentTransaction transaction = invocation.getArgument(0);
@@ -132,7 +132,7 @@ class PaymentServiceImplTest {
                 throw new RuntimeException(e);
             }
         })) {
-            assertThatThrownBy(() -> paymentService.createPaymentPreference(1L, MembershipPlan.PREMIUM))
+            assertThatThrownBy(() -> paymentService.createPaymentPreference(1L, MembershipPlan.PRO))
                     .isInstanceOf(PaymentProcessingException.class);
         }
     }
@@ -161,7 +161,7 @@ class PaymentServiceImplTest {
 
             assertThat(transaction.getStatus()).isEqualTo(PaymentStatus.APPROVED);
             assertThat(transaction.getMercadoPagoPaymentId()).isEqualTo("999");
-            verify(membershipService).activatePremiumMembership(membership);
+            verify(membershipService).activatePaidMembership(membership);
             verify(paymentTransactionRepository).save(transaction);
         }
     }
@@ -187,7 +187,7 @@ class PaymentServiceImplTest {
             paymentService.processWebhookNotification("999");
 
             assertThat(transaction.getStatus()).isEqualTo(PaymentStatus.REJECTED);
-            verify(membershipService, never()).activatePremiumMembership(any());
+            verify(membershipService, never()).activatePaidMembership(any());
         }
     }
 
@@ -208,7 +208,7 @@ class PaymentServiceImplTest {
         })) {
             paymentService.processWebhookNotification("999");
 
-            verify(membershipService, never()).activatePremiumMembership(any());
+            verify(membershipService, never()).activatePaidMembership(any());
             verify(paymentTransactionRepository, never()).save(any());
         }
     }
@@ -260,7 +260,7 @@ class PaymentServiceImplTest {
     void getPaymentStatus_Owner_ReturnsStatus() {
         Player owner = Player.builder().id(1L).build();
         Membership membership = Membership.builder().player(owner).status(MembershipStatus.ACTIVE).build();
-        PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).amount(PREMIUM_PRICE).build();
+        PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).amount(PRO_PRICE).build();
         when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
 
         PaymentStatusResponseDTO response = paymentService.getPaymentStatus(42L, 1L, false);
@@ -275,7 +275,7 @@ class PaymentServiceImplTest {
     void getPaymentStatus_Admin_ReturnsStatus() {
         Player owner = Player.builder().id(1L).build();
         Membership membership = Membership.builder().player(owner).status(MembershipStatus.ACTIVE).build();
-        PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).amount(PREMIUM_PRICE).build();
+        PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).amount(PRO_PRICE).build();
         when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
 
         PaymentStatusResponseDTO response = paymentService.getPaymentStatus(42L, 999L, true);

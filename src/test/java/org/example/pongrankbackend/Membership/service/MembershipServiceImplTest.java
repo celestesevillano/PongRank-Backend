@@ -10,6 +10,8 @@ import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -37,50 +39,65 @@ class MembershipServiceImplTest {
     @InjectMocks
     private MembershipServiceImpl membershipService;
 
-    @Test
-    @DisplayName("isPremiumMember: true cuando hay una membresía ACTIVE de plan PREMIUM sin vencer")
-    void isPremiumMember_ActivePremiumNotExpired_ReturnsTrue() {
+    @ParameterizedTest
+    @EnumSource(value = MembershipPlan.class, names = "FREEMIUM", mode = EnumSource.Mode.EXCLUDE)
+    @DisplayName("getActivePlan: devuelve el plan pagado cuando hay una membresía ACTIVE sin vencer")
+    void getActivePlan_ActivePaidNotExpired_ReturnsPlan(MembershipPlan plan) {
         Membership membership = Membership.builder()
-                .plan(MembershipPlan.PREMIUM)
+                .plan(plan)
                 .status(MembershipStatus.ACTIVE)
                 .endDate(LocalDateTime.now().plusDays(10))
                 .build();
         when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(membership));
 
-        assertThat(membershipService.isPremiumMember(1L)).isTrue();
+        assertThat(membershipService.getActivePlan(1L)).isEqualTo(plan);
+        assertThat(membershipService.isPaidMember(1L)).isTrue();
     }
 
     @Test
-    @DisplayName("isPremiumMember: false cuando no hay ninguna membresía ACTIVE")
-    void isPremiumMember_NoActiveMembership_ReturnsFalse() {
+    @DisplayName("getActivePlan: FREEMIUM cuando no hay ninguna membresía ACTIVE")
+    void getActivePlan_NoActiveMembership_ReturnsFreemium() {
         when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(Optional.empty());
 
-        assertThat(membershipService.isPremiumMember(1L)).isFalse();
+        assertThat(membershipService.getActivePlan(1L)).isEqualTo(MembershipPlan.FREEMIUM);
+        assertThat(membershipService.isPaidMember(1L)).isFalse();
     }
 
     @Test
-    @DisplayName("isPremiumMember: false cuando la membresía ACTIVE es FREEMIUM")
-    void isPremiumMember_ActiveButFreemium_ReturnsFalse() {
+    @DisplayName("getActivePlan: FREEMIUM cuando endDate ya pasó aunque el status siga en ACTIVE (el scheduler todavía no corrió)")
+    void getActivePlan_ActivePaidButEndDatePassed_ReturnsFreemium() {
         Membership membership = Membership.builder()
-                .plan(MembershipPlan.FREEMIUM)
-                .status(MembershipStatus.ACTIVE)
-                .build();
-        when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(membership));
-
-        assertThat(membershipService.isPremiumMember(1L)).isFalse();
-    }
-
-    @Test
-    @DisplayName("isPremiumMember: false cuando endDate ya pasó aunque el status siga en ACTIVE (el scheduler todavía no corrió)")
-    void isPremiumMember_ActivePremiumButEndDatePassed_ReturnsFalse() {
-        Membership membership = Membership.builder()
-                .plan(MembershipPlan.PREMIUM)
+                .plan(MembershipPlan.PRO)
                 .status(MembershipStatus.ACTIVE)
                 .endDate(LocalDateTime.now().minusDays(1))
                 .build();
         when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(membership));
 
-        assertThat(membershipService.isPremiumMember(1L)).isFalse();
+        assertThat(membershipService.getActivePlan(1L)).isEqualTo(MembershipPlan.FREEMIUM);
+    }
+
+    @Test
+    @DisplayName("hasCoachAccess: true solo para PRO y ENTERPRISE")
+    void hasCoachAccess_OnlyProAndEnterprise() {
+        Membership pro = Membership.builder().plan(MembershipPlan.PRO).status(MembershipStatus.ACTIVE).build();
+        when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(pro));
+        assertThat(membershipService.hasCoachAccess(1L)).isTrue();
+
+        Membership basic = Membership.builder().plan(MembershipPlan.BASIC).status(MembershipStatus.ACTIVE).build();
+        when(membershipRepository.findByPlayerIdAndStatus(2L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(basic));
+        assertThat(membershipService.hasCoachAccess(2L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("canCreateClub: true solo para ENTERPRISE")
+    void canCreateClub_OnlyEnterprise() {
+        Membership enterprise = Membership.builder().plan(MembershipPlan.ENTERPRISE).status(MembershipStatus.ACTIVE).build();
+        when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(enterprise));
+        assertThat(membershipService.canCreateClub(1L)).isTrue();
+
+        Membership pro = Membership.builder().plan(MembershipPlan.PRO).status(MembershipStatus.ACTIVE).build();
+        when(membershipRepository.findByPlayerIdAndStatus(2L, MembershipStatus.ACTIVE)).thenReturn(Optional.of(pro));
+        assertThat(membershipService.canCreateClub(2L)).isFalse();
     }
 
     @Test
@@ -93,10 +110,10 @@ class MembershipServiceImplTest {
                 .build();
         when(membershipRepository.findByPlayerIdAndStatus(1L, MembershipStatus.PENDING)).thenReturn(Optional.of(pending));
 
-        Membership result = membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PREMIUM);
+        Membership result = membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PRO);
 
         assertThat(result).isSameAs(pending);
-        assertThat(result.getPlan()).isEqualTo(MembershipPlan.PREMIUM);
+        assertThat(result.getPlan()).isEqualTo(MembershipPlan.PRO);
         verify(membershipRepository, never()).save(any());
         verify(playerRepository, never()).findById(any());
     }
@@ -109,10 +126,10 @@ class MembershipServiceImplTest {
         when(playerRepository.findById(1L)).thenReturn(Optional.of(player));
         when(membershipRepository.save(any(Membership.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        Membership result = membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PREMIUM);
+        Membership result = membershipService.getOrCreatePendingMembership(1L, MembershipPlan.PRO);
 
         assertThat(result.getPlayer()).isSameAs(player);
-        assertThat(result.getPlan()).isEqualTo(MembershipPlan.PREMIUM);
+        assertThat(result.getPlan()).isEqualTo(MembershipPlan.PRO);
         assertThat(result.getStatus()).isEqualTo(MembershipStatus.PENDING);
     }
 
@@ -122,17 +139,17 @@ class MembershipServiceImplTest {
         when(membershipRepository.findByPlayerIdAndStatus(99L, MembershipStatus.PENDING)).thenReturn(Optional.empty());
         when(playerRepository.findById(99L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> membershipService.getOrCreatePendingMembership(99L, MembershipPlan.PREMIUM))
+        assertThatThrownBy(() -> membershipService.getOrCreatePendingMembership(99L, MembershipPlan.PRO))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Jugador no encontrado");
     }
 
     @Test
-    @DisplayName("activatePremiumMembership: pone ACTIVE, fija startDate y endDate a 30 días")
-    void activatePremiumMembership_SetsActiveWithThirtyDayWindow() {
-        Membership membership = Membership.builder().plan(MembershipPlan.PREMIUM).status(MembershipStatus.PENDING).build();
+    @DisplayName("activatePaidMembership: pone ACTIVE, fija startDate y endDate a 30 días")
+    void activatePaidMembership_SetsActiveWithThirtyDayWindow() {
+        Membership membership = Membership.builder().plan(MembershipPlan.PRO).status(MembershipStatus.PENDING).build();
 
-        membershipService.activatePremiumMembership(membership);
+        membershipService.activatePaidMembership(membership);
 
         assertThat(membership.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
         assertThat(membership.getStartDate()).isNotNull();

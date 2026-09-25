@@ -13,6 +13,7 @@ import org.example.pongrankbackend.CommunityMembership.MembershipStatus;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberAddRequestDTO;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRoleUpdateDTO;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
+import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
@@ -69,9 +70,15 @@ class CommunityServiceImplTest {
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(communityService, "maxCreatedFreemium", 1);
-        ReflectionTestUtils.setField(communityService, "maxCreatedPremium", 5);
+        ReflectionTestUtils.setField(communityService, "maxCreatedBasic", 5);
+        ReflectionTestUtils.setField(communityService, "maxCreatedPro", 8);
+        ReflectionTestUtils.setField(communityService, "maxCreatedEnterprise", 8);
         ReflectionTestUtils.setField(communityService, "maxTotalFreemium", 2);
-        ReflectionTestUtils.setField(communityService, "maxTotalPremium", 7);
+        ReflectionTestUtils.setField(communityService, "maxTotalBasic", 7);
+        ReflectionTestUtils.setField(communityService, "maxTotalPro", 10);
+        ReflectionTestUtils.setField(communityService, "maxTotalEnterprise", 10);
+
+        lenient().when(membershipService.getActivePlan(anyLong())).thenReturn(MembershipPlan.FREEMIUM);
 
         creator = Player.builder()
                 .id(CREATOR_ID)
@@ -123,7 +130,7 @@ class CommunityServiceImplTest {
     }
 
     private void givenIsPremium(boolean isPremium) {
-        when(membershipService.isPremiumMember(anyLong())).thenReturn(isPremium);
+        when(membershipService.getActivePlan(anyLong())).thenReturn(isPremium ? MembershipPlan.BASIC : MembershipPlan.FREEMIUM);
     }
 
     private void givenActiveCommunitiesCreated(long count) {

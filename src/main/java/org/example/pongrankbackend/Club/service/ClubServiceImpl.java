@@ -15,6 +15,7 @@ import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
 import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.Club.repository.ClubReviewRepository;
 import org.example.pongrankbackend.ClubMembership.service.ClubMembershipService;
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
@@ -37,17 +38,20 @@ public class ClubServiceImpl implements ClubService {
     private final ClubReviewRepository clubReviewRepository;
     private final PlayerRepository playerRepository;
     private final ClubMembershipService clubMembershipService;
+    private final MembershipService membershipService;
     private final ModelMapper modelMapper;
 
     public ClubServiceImpl(ClubRepository clubRepository,
                            ClubReviewRepository clubReviewRepository,
                            PlayerRepository playerRepository,
                            ClubMembershipService clubMembershipService,
+                           MembershipService membershipService,
                            ModelMapper modelMapper) {
         this.clubRepository = clubRepository;
         this.clubReviewRepository = clubReviewRepository;
         this.playerRepository = playerRepository;
         this.clubMembershipService = clubMembershipService;
+        this.membershipService = membershipService;
         this.modelMapper = modelMapper;
     }
 
@@ -57,6 +61,10 @@ public class ClubServiceImpl implements ClubService {
     public ClubResponseDTO registerClub(Long requesterId, ClubRegisterRequestDTO dto) {
         Player requester = findPlayerById(requesterId);
         validateCanAdministerClub(requesterId, null);
+
+        if (!membershipService.canCreateClub(requesterId)) {
+            throw new UnauthorizedActionException("Solo los jugadores con plan ENTERPRISE pueden crear un club");
+        }
 
         String normalizedName = dto.getName().trim();
         validateNameIsAvailable(normalizedName);

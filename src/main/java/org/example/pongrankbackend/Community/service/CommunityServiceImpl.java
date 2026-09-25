@@ -16,6 +16,7 @@ import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRespon
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRoleUpdateDTO;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityRankingEntryDTO;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
+import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
@@ -52,14 +53,26 @@ public class CommunityServiceImpl implements CommunityService {
     @Value("${community.max-created.freemium}")
     private int maxCreatedFreemium;
 
-    @Value("${community.max-created.premium}")
-    private int maxCreatedPremium;
+    @Value("${community.max-created.basic}")
+    private int maxCreatedBasic;
+
+    @Value("${community.max-created.pro}")
+    private int maxCreatedPro;
+
+    @Value("${community.max-created.enterprise}")
+    private int maxCreatedEnterprise;
 
     @Value("${community.max-total.freemium}")
     private int maxTotalFreemium;
 
-    @Value("${community.max-total.premium}")
-    private int maxTotalPremium;
+    @Value("${community.max-total.basic}")
+    private int maxTotalBasic;
+
+    @Value("${community.max-total.pro}")
+    private int maxTotalPro;
+
+    @Value("${community.max-total.enterprise}")
+    private int maxTotalEnterprise;
 
     public CommunityServiceImpl(CommunityRepository communityRepository,
                                 CommunityMembershipRepository membershipRepository,
@@ -306,8 +319,7 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     private void verifyCreationLimit(Long playerId) {
-        boolean isPremium = membershipService.isPremiumMember(playerId);
-        int limit = isPremium ? maxCreatedPremium : maxCreatedFreemium;
+        int limit = maxCreatedFor(membershipService.getActivePlan(playerId));
 
         long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
 
@@ -318,8 +330,7 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     private void verifyTotalMembershipLimit(Long playerId) {
-        boolean isPremium = membershipService.isPremiumMember(playerId);
-        int limit = isPremium ? maxTotalPremium : maxTotalFreemium;
+        int limit = maxTotalFor(membershipService.getActivePlan(playerId));
 
         long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
         long activeMemberships = membershipRepository.countByPlayerIdAndRoleAndStatus(
@@ -329,6 +340,24 @@ public class CommunityServiceImpl implements CommunityService {
             throw new CommunityMembershipException(
                     "Player " + playerId + " reached the maximum of " + limit + " total communities for their plan");
         }
+    }
+
+    private int maxCreatedFor(MembershipPlan plan) {
+        return switch (plan) {
+            case FREEMIUM -> maxCreatedFreemium;
+            case BASIC -> maxCreatedBasic;
+            case PRO -> maxCreatedPro;
+            case ENTERPRISE -> maxCreatedEnterprise;
+        };
+    }
+
+    private int maxTotalFor(MembershipPlan plan) {
+        return switch (plan) {
+            case FREEMIUM -> maxTotalFreemium;
+            case BASIC -> maxTotalBasic;
+            case PRO -> maxTotalPro;
+            case ENTERPRISE -> maxTotalEnterprise;
+        };
     }
 
     private void verifyCommunityIsActive(Community community) {
