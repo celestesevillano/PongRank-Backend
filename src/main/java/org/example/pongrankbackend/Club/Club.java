@@ -35,10 +35,6 @@ public class Club {
     @Column(nullable = false, length = 250)
     private String address;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "b2b_plan", length = 30)
-    private B2BPlan b2bPlan;
-
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
