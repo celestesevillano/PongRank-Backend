@@ -43,6 +43,10 @@ public class Match {
     @JoinColumn(name = "tournament_id")
     private Tournament tournament;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "winner_id")
+    private Player winner;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

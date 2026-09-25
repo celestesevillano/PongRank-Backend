@@ -21,4 +21,8 @@ public interface MatchIntegrationPort {
     // True when a player already reported (or confirmed/disputed) a score in the Match module.
     // A W.O. is only allowed while nothing has been reported, so a real result is never overwritten.
     boolean hasReportedScore(Match match);
+
+    // Closes the underlying Match as a WALKOVER with the given winner, without registering sets or points
+    void closeAsWalkover(Match match, Player winner);
 }
+

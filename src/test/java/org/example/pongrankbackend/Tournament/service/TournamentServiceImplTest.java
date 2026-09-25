@@ -305,6 +305,26 @@ class TournamentServiceImplTest {
     }
 
     @Test
+    @DisplayName("declareWalkover: cuando tiene un Match real vinculado, lo cierra como WALKOVER a través del puerto")
+    void declareWalkover_WithRealMatch_ClosesMatchAsWalkover() {
+        Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
+        Player p1 = player(11L, 1500);
+        Player p2 = player(12L, 1500);
+        Match real = Match.builder().id(99L).build();
+        TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
+                .groupNumber(1).player1(p1).player2(p2).match(real).status(TournamentMatchStatus.SCHEDULED).build();
+        when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
+        when(tournamentMatchRepository.findById(500L)).thenReturn(Optional.of(match));
+        when(matchIntegrationPort.hasReportedScore(real)).thenReturn(false);
+
+        tournamentService.declareWalkover(TOURNAMENT_ID, 500L, ADMIN_ID, new TournamentWalkoverRequestDTO(11L));
+
+        assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.WALKOVER);
+        assertThat(match.getWinner()).isEqualTo(p2);
+        verify(matchIntegrationPort).closeAsWalkover(real, p2);
+    }
+
+    @Test
     @DisplayName("declareWalkover: no se permite si ya hay un marcador reportado en Match")
     void declareWalkover_ScoreAlreadyReported_Throws() {
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);

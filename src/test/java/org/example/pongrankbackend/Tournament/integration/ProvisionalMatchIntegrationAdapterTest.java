@@ -117,4 +117,24 @@ class ProvisionalMatchIntegrationAdapterTest {
         assertThat(adapter.hasReportedScore(matchWithId(7L))).isTrue();
         assertThat(adapter.hasReportedScore(null)).isFalse();
     }
+
+    @Test
+    @DisplayName("closeAsWalkover: delega el cierre por W.O. a MatchService")
+    void closeAsWalkover_DelegatesToMatchService() {
+        Match match = matchWithId(7L);
+        Player winner = Player.builder().id(2L).build();
+
+        adapter.closeAsWalkover(match, winner);
+
+        verify(matchService).closeMatchAsWalkover(7L, 2L);
+    }
+
+    @Test
+    @DisplayName("closeAsWalkover: sin match o sin id no hace nada")
+    void closeAsWalkover_NullMatch_NoInteraction() {
+        adapter.closeAsWalkover(null, null);
+        adapter.closeAsWalkover(new Match(), null);
+
+        verifyNoInteractions(matchService);
+    }
 }

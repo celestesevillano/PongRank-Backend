@@ -564,4 +564,126 @@ class MatchServiceImplTest {
         assertThat(result.getContent().get(0).getTournamentId()).isEqualTo(tournamentId);
         verify(matchRepository).findByTournamentId(tournamentId, pageable);
     }
+
+    @Test
+    @DisplayName("shouldCloseMatchAsWalkoverSuccessfully")
+    void shouldCloseMatchAsWalkoverSuccessfully() {
+        // Arrange
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+        Match match = Match.builder().id(matchId).player1(p1).player2(p2).status(MatchStatus.CREATED).build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+        when(playerRepository.findById(2L)).thenReturn(Optional.of(p2));
+        when(matchRepository.save(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubModelMapper(p1);
+        stubModelMapper(p2);
+
+        // Act
+        MatchResponseDTO result = matchService.closeMatchAsWalkover(matchId, 2L);
+
+        // Assert
+        assertThat(result).isNotNull();
+        assertThat(result.getStatus()).isEqualTo(MatchStatus.WALKOVER);
+        assertThat(result.getWinnerId()).isEqualTo(2L);
+        assertThat(result.getScoreSummary()).isEqualTo("W.O.");
+        assertThat(result.getConfirmedAt()).isNotNull();
+
+        assertThat(match.getStatus()).isEqualTo(MatchStatus.WALKOVER);
+        assertThat(match.getWinner()).isEqualTo(p2);
+        assertThat(match.getConfirmedAt()).isNotNull();
+
+        verify(matchRepository).save(match);
+        verify(webSocketNotifier).notifyMatchConfirmed(eq(matchId), any(MatchResponseDTO.class));
+        verifyNoInteractions(eventPublisher);
+    }
+
+    @Test
+    @DisplayName("shouldThrowResourceNotFoundExceptionWhenMatchNotFoundOnCloseMatchAsWalkover")
+    void shouldThrowResourceNotFoundExceptionWhenMatchNotFoundOnCloseMatchAsWalkover() {
+        Long matchId = 999L;
+        when(matchRepository.findById(matchId)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> matchService.closeMatchAsWalkover(matchId, 1L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Partido no encontrado con ID: 999");
+    }
+
+    @Test
+    @DisplayName("shouldThrowInvalidMatchStateExceptionWhenMatchAlreadyConfirmedOnCloseWalkover")
+    void shouldThrowInvalidMatchStateExceptionWhenMatchAlreadyConfirmedOnCloseWalkover() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+        Match match = Match.builder().id(matchId).player1(p1).player2(p2).status(MatchStatus.CONFIRMED).build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchService.closeMatchAsWalkover(matchId, 1L))
+                .isInstanceOf(InvalidMatchStateException.class)
+                .hasMessageContaining("ya fue confirmado y cerrado previamente");
+    }
+
+    @Test
+    @DisplayName("shouldThrowInvalidMatchStateExceptionWhenMatchAlreadyCancelledOnCloseWalkover")
+    void shouldThrowInvalidMatchStateExceptionWhenMatchAlreadyCancelledOnCloseWalkover() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+        Match match = Match.builder().id(matchId).player1(p1).player2(p2).status(MatchStatus.CANCELLED).build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchService.closeMatchAsWalkover(matchId, 1L))
+                .isInstanceOf(InvalidMatchStateException.class)
+                .hasMessageContaining("se encuentra cancelado");
+    }
+
+    @Test
+    @DisplayName("shouldThrowInvalidMatchStateExceptionWhenMatchAlreadyWalkoverOnCloseWalkover")
+    void shouldThrowInvalidMatchStateExceptionWhenMatchAlreadyWalkoverOnCloseWalkover() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+        Match match = Match.builder().id(matchId).player1(p1).player2(p2).status(MatchStatus.WALKOVER).build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchService.closeMatchAsWalkover(matchId, 1L))
+                .isInstanceOf(InvalidMatchStateException.class)
+                .hasMessageContaining("ya fue cerrado por W.O.");
+    }
+
+    @Test
+    @DisplayName("shouldThrowInvalidMatchStateExceptionWhenWinnerDoesNotParticipateInMatch")
+    void shouldThrowInvalidMatchStateExceptionWhenWinnerDoesNotParticipateInMatch() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+        Match match = Match.builder().id(matchId).player1(p1).player2(p2).status(MatchStatus.CREATED).build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchService.closeMatchAsWalkover(matchId, 999L))
+                .isInstanceOf(InvalidMatchStateException.class)
+                .hasMessageContaining("no participa en este partido");
+    }
+
+    @Test
+    @DisplayName("shouldThrowInvalidMatchStateExceptionWhenSubmittingScoreOnWalkoverMatch")
+    void shouldThrowInvalidMatchStateExceptionWhenSubmittingScoreOnWalkoverMatch() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+        Match match = Match.builder().id(matchId).player1(p1).player2(p2).status(MatchStatus.WALKOVER).build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        MatchScoreSubmitDTO dto = MatchScoreSubmitDTO.builder().sets(List.of()).build();
+
+        assertThatThrownBy(() -> matchService.submitScore(matchId, p1.getId(), dto))
+                .isInstanceOf(InvalidMatchStateException.class)
+                .hasMessageContaining("cerrado por incomparecencia (W.O.)");
+    }
 }

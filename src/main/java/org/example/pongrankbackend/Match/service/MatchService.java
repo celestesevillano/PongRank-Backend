@@ -40,4 +40,6 @@ public interface MatchService {
     MatchDetailResponseDTO disputeMatch(Long matchId, Long actingPlayerId, MatchDisputeRequestDTO dto);
 
     MatchResponseDTO cancelMatch(Long matchId, Long actingPlayerId);
+
+    MatchResponseDTO closeMatchAsWalkover(Long matchId, Long winnerId);
 }
