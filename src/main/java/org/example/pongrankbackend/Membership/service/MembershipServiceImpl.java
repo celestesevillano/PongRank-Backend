@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -61,5 +62,13 @@ public class MembershipServiceImpl implements MembershipService {
         membership.setStartDate(LocalDateTime.now());
         membership.setEndDate(LocalDateTime.now().plusDays(PREMIUM_DURATION_DAYS));
         membershipRepository.save(membership);
+    }
+
+    @Override
+    @Transactional
+    public void expireOverdueMemberships() {
+        List<Membership> overdue = membershipRepository.findByStatusAndEndDateBefore(MembershipStatus.ACTIVE, LocalDateTime.now());
+        overdue.forEach(membership -> membership.setStatus(MembershipStatus.EXPIRED));
+        membershipRepository.saveAll(overdue);
     }
 }

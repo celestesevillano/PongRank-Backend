@@ -7,9 +7,11 @@ public interface MembershipService {
 
     boolean isPremiumMember(Long playerId);
 
-    // Internal operations used by PaymentService (not exposed through HTTP)
+    // Internal operations, no expuestas por HTTP (las usa PaymentService y el scheduler de vencimiento)
 
     Membership getOrCreatePendingMembership(Long playerId, MembershipPlan plan);
 
     void activatePremiumMembership(Membership membership);
+
+    void expireOverdueMemberships();
 }
