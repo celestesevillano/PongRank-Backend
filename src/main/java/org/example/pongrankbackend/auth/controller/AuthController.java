@@ -5,7 +5,9 @@ import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.auth.dto.AuthRequestDTO;
 import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
+import org.example.pongrankbackend.auth.dto.ForgotPasswordRequestDTO;
 import org.example.pongrankbackend.auth.dto.RefreshTokenRequestDTO;
+import org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO;
 import org.example.pongrankbackend.auth.service.AuthService;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
@@ -40,6 +42,18 @@ public class AuthController {
     public ResponseEntity<AuthResponseDTO> refresh(@Valid @RequestBody RefreshTokenRequestDTO dto) {
         AuthResponseDTO response = authService.refreshToken(dto);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO dto) {
+        authService.forgotPassword(dto);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO dto) {
+        authService.resetPassword(dto);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/me")

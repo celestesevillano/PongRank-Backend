@@ -11,6 +11,7 @@ import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.dto.RefreshTokenRequestDTO;
 import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
+import org.example.pongrankbackend.email.service.EmailService;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.example.pongrankbackend.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
@@ -27,6 +28,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -37,10 +40,16 @@ class AuthServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
+    private org.example.pongrankbackend.auth.repository.PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
     private JwtService jwtService;
+
+    @Mock
+    private EmailService emailService;
 
     @Mock
     private ModelMapper modelMapper;
@@ -266,5 +275,98 @@ class AuthServiceImplTest {
         assertThatThrownBy(() -> authService.refreshToken(dto))
                 .isInstanceOf(InvalidCredentialsException.class)
                 .hasMessageContaining("suspendida");
+    }
+
+    // ----- forgotPassword / resetPassword -----
+
+    @Test
+    @DisplayName("forgotPassword: crea un token y envía el correo cuando el email existe")
+    void forgotPassword_EmailExists_CreatesTokenAndSendsEmail() {
+        org.springframework.test.util.ReflectionTestUtils.setField(authService, "frontendUrl", "http://localhost:5173");
+        Player player = createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE);
+        when(playerRepository.findByEmail("adriana@utec.edu.pe")).thenReturn(Optional.of(player));
+
+        authService.forgotPassword(org.example.pongrankbackend.auth.dto.ForgotPasswordRequestDTO.builder()
+                .email("adriana@utec.edu.pe").build());
+
+        verify(passwordResetTokenRepository).save(any(org.example.pongrankbackend.auth.PasswordResetToken.class));
+        verify(emailService).sendPasswordResetEmail(eq(player), anyString(), eq(30));
+    }
+
+    @Test
+    @DisplayName("forgotPassword: no falla ni crea token cuando el email no existe (no filtra cuentas registradas)")
+    void forgotPassword_EmailNotFound_DoesNothing() {
+        when(playerRepository.findByEmail("no-existe@utec.edu.pe")).thenReturn(Optional.empty());
+
+        authService.forgotPassword(org.example.pongrankbackend.auth.dto.ForgotPasswordRequestDTO.builder()
+                .email("no-existe@utec.edu.pe").build());
+
+        verify(passwordResetTokenRepository, never()).save(any());
+        verify(emailService, never()).sendPasswordResetEmail(any(), any(), anyInt());
+    }
+
+    @Test
+    @DisplayName("resetPassword: cambia la contraseña y marca el token como usado cuando es válido")
+    void resetPassword_ValidToken_ChangesPasswordAndMarksTokenUsed() {
+        Player player = createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE);
+        org.example.pongrankbackend.auth.PasswordResetToken resetToken = org.example.pongrankbackend.auth.PasswordResetToken.builder()
+                .token("valid-token")
+                .player(player)
+                .expiresAt(java.time.LocalDateTime.now().plusMinutes(10))
+                .used(false)
+                .build();
+        when(passwordResetTokenRepository.findByToken("valid-token")).thenReturn(Optional.of(resetToken));
+        when(passwordEncoder.encode("nuevaClave123")).thenReturn("hashed");
+
+        authService.resetPassword(org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO.builder()
+                .token("valid-token").newPassword("nuevaClave123").build());
+
+        assertThat(player.getPassword()).isEqualTo("hashed");
+        assertThat(resetToken.isUsed()).isTrue();
+        verify(playerRepository).save(player);
+        verify(passwordResetTokenRepository).save(resetToken);
+    }
+
+    @Test
+    @DisplayName("resetPassword: lanza InvalidCredentialsException cuando el token no existe")
+    void resetPassword_TokenNotFound_ThrowsException() {
+        when(passwordResetTokenRepository.findByToken("no-existe")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.resetPassword(org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO.builder()
+                .token("no-existe").newPassword("nuevaClave123").build()))
+                .isInstanceOf(InvalidCredentialsException.class);
+    }
+
+    @Test
+    @DisplayName("resetPassword: lanza InvalidCredentialsException cuando el token ya expiró")
+    void resetPassword_ExpiredToken_ThrowsException() {
+        org.example.pongrankbackend.auth.PasswordResetToken expiredToken = org.example.pongrankbackend.auth.PasswordResetToken.builder()
+                .token("expired-token")
+                .player(createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE))
+                .expiresAt(java.time.LocalDateTime.now().minusMinutes(1))
+                .used(false)
+                .build();
+        when(passwordResetTokenRepository.findByToken("expired-token")).thenReturn(Optional.of(expiredToken));
+
+        assertThatThrownBy(() -> authService.resetPassword(org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO.builder()
+                .token("expired-token").newPassword("nuevaClave123").build()))
+                .isInstanceOf(InvalidCredentialsException.class)
+                .hasMessageContaining("vencido");
+    }
+
+    @Test
+    @DisplayName("resetPassword: lanza InvalidCredentialsException cuando el token ya fue usado")
+    void resetPassword_UsedToken_ThrowsException() {
+        org.example.pongrankbackend.auth.PasswordResetToken usedToken = org.example.pongrankbackend.auth.PasswordResetToken.builder()
+                .token("used-token")
+                .player(createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE))
+                .expiresAt(java.time.LocalDateTime.now().plusMinutes(10))
+                .used(true)
+                .build();
+        when(passwordResetTokenRepository.findByToken("used-token")).thenReturn(Optional.of(usedToken));
+
+        assertThatThrownBy(() -> authService.resetPassword(org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO.builder()
+                .token("used-token").newPassword("nuevaClave123").build()))
+                .isInstanceOf(InvalidCredentialsException.class);
     }
 }
