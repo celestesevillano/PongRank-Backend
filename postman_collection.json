@@ -555,6 +555,49 @@
           "response": []
         },
         {
+          "name": "Cancelar solicitud",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/{{friendshipId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "{{friendshipId}}",
+                "cancel"
+              ]
+            },
+            "description": "El emisor cancela su propia solicitud mientras siga PENDING."
+          },
+          "response": []
+        },
+        {
+          "name": "Deshacer amistad",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/{{friendshipId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "{{friendshipId}}"
+              ]
+            },
+            "description": "Cualquiera de los dos jugadores termina una amistad ya ACCEPTED."
+          },
+          "response": []
+        },
+        {
           "name": "Listar amigos",
           "request": {
             "method": "GET",
@@ -1137,6 +1180,42 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"El marcador del tercer set no coincide\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resolver disputa (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/resolve-dispute",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "resolve-dispute"
+              ]
+            },
+            "description": "Solo ROLE_SYSTEM_ADMIN. Declara un ganador (afecta el rating) o anula el partido si winnerId es null.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"winnerId\": null,\n  \"resolutionNote\": \"Se revisó el video del partido: no hay evidencia suficiente, se anula\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
