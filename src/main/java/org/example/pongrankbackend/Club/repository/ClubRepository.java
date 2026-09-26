@@ -19,4 +19,8 @@ public interface ClubRepository extends JpaRepository<Club, Long> {
     boolean existsByAdminIdAndStatusIn(Long adminId, Collection<ClubStatus> statuses);
 
     boolean existsByAdminIdAndStatusInAndIdNot(Long adminId, Collection<ClubStatus> statuses, Long clubId);
+
+    long countByAdminIdAndStatusIn(Long adminId, Collection<ClubStatus> statuses);
+
+    long countByAdminIdAndStatusInAndIdNot(Long adminId, Collection<ClubStatus> statuses, Long clubId);
 }

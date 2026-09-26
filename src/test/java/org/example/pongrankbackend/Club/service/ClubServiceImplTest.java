@@ -18,6 +18,7 @@ import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,6 +76,11 @@ class ClubServiceImplTest {
 
     @InjectMocks
     private ClubServiceImpl clubService;
+
+    @BeforeEach
+    void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(clubService, "maxAdministeredEnterprise", 1);
+    }
 
     private Player player(Long id, Role role) {
         return Player.builder().id(id).name("Jugador " + id).role(role).build();
@@ -406,11 +412,11 @@ class ClubServiceImplTest {
         actingAs(ADMIN_ID, Role.ROLE_USER);
         Club club = club(ClubStatus.REJECTED);
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
-        when(clubRepository.existsByAdminIdAndStatusInAndIdNot(ADMIN_ID, ClubStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(true);
+        when(clubRepository.countByAdminIdAndStatusInAndIdNot(ADMIN_ID, ClubStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(1L);
 
         assertThatThrownBy(() -> clubService.resubmitClub(CLUB_ID, new ClubResubmitRequestDTO()))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("administra otro club");
+                .hasMessageContaining("máximo");
         assertThat(club.getStatus()).isEqualTo(ClubStatus.REJECTED);
     }
 
