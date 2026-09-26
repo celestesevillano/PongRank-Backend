@@ -19,7 +19,7 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
-import org.example.pongrankbackend.email.service.EmailService;
+import org.example.pongrankbackend.Membership.event.PaymentConfirmedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -53,7 +53,7 @@ class PaymentServiceImplTest {
     private PaymentTransactionRepository paymentTransactionRepository;
 
     @Mock
-    private EmailService emailService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
@@ -146,7 +146,8 @@ class PaymentServiceImplTest {
     @Test
     @DisplayName("processWebhookNotification: pago approved activa la membresía")
     void processWebhookNotification_Approved_ActivatesMembership() throws MPException, MPApiException {
-        Membership membership = Membership.builder().id(3L).status(MembershipStatus.PENDING).build();
+        Player owner = Player.builder().id(1L).build();
+        Membership membership = Membership.builder().id(3L).player(owner).status(MembershipStatus.PENDING).build();
         PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.PENDING).build();
         when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
 
@@ -167,6 +168,7 @@ class PaymentServiceImplTest {
             assertThat(transaction.getMercadoPagoPaymentId()).isEqualTo("999");
             verify(membershipService).activatePaidMembership(membership);
             verify(paymentTransactionRepository).saveAndFlush(transaction);
+            verify(eventPublisher).publishEvent(any(PaymentConfirmedEvent.class));
         }
     }
 
@@ -240,7 +242,7 @@ class PaymentServiceImplTest {
 
             assertThat(transaction.getStatus()).isEqualTo(PaymentStatus.APPROVED);
             verify(membershipService, never()).activatePaidMembership(any());
-            verify(emailService, never()).sendPaymentConfirmationEmail(any(), any(), any(), any());
+            verify(eventPublisher, never()).publishEvent(any(PaymentConfirmedEvent.class));
         }
     }
 
