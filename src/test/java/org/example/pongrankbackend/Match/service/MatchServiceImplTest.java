@@ -565,6 +565,126 @@ class MatchServiceImplTest {
     }
 
     @Test
+    @DisplayName("resolveDispute: el admin confirma el partido declarando un ganador")
+    void resolveDispute_WithWinner_ConfirmsMatch() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+
+        Match match = Match.builder()
+                .id(matchId)
+                .player1(p1)
+                .player2(p2)
+                .status(MatchStatus.DISPUTED)
+                .disputeReason("El segundo set lo gané yo 11-9")
+                .build();
+
+        MatchDisputeResolutionDTO dto = MatchDisputeResolutionDTO.builder()
+                .winnerId(p1.getId())
+                .resolutionNote("Se revisó el video del partido, gana Alice")
+                .build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+        when(matchRepository.save(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubModelMapper(p1);
+        stubModelMapper(p2);
+
+        MatchDetailResponseDTO result = matchService.resolveDispute(matchId, dto);
+
+        assertThat(result.getStatus()).isEqualTo(MatchStatus.CONFIRMED);
+        assertThat(match.getStatus()).isEqualTo(MatchStatus.CONFIRMED);
+        assertThat(match.getWinner()).isEqualTo(p1);
+        assertThat(match.getConfirmedAt()).isNotNull();
+        assertThat(match.getDisputeReason()).contains("Resolución del administrador");
+        verify(eventPublisher).publishEvent(any(MatchConfirmedEvent.class));
+    }
+
+    @Test
+    @DisplayName("resolveDispute: el admin anula el partido sin declarar ganador")
+    void resolveDispute_WithoutWinner_CancelsMatch() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+
+        Match match = Match.builder()
+                .id(matchId)
+                .player1(p1)
+                .player2(p2)
+                .status(MatchStatus.DISPUTED)
+                .disputeReason("Ambos alegan haber ganado")
+                .build();
+
+        MatchDisputeResolutionDTO dto = MatchDisputeResolutionDTO.builder()
+                .resolutionNote("No hay evidencia suficiente, se anula")
+                .build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+        when(matchRepository.save(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubModelMapper(p1);
+        stubModelMapper(p2);
+
+        MatchDetailResponseDTO result = matchService.resolveDispute(matchId, dto);
+
+        assertThat(result.getStatus()).isEqualTo(MatchStatus.CANCELLED);
+        assertThat(match.getWinner()).isNull();
+        verify(eventPublisher, never()).publishEvent(any(MatchConfirmedEvent.class));
+    }
+
+    @Test
+    @DisplayName("resolveDispute: solo se puede resolver un partido en estado DISPUTED")
+    void resolveDispute_NotDisputed_ThrowsException() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+
+        Match match = Match.builder()
+                .id(matchId)
+                .player1(p1)
+                .player2(p2)
+                .status(MatchStatus.CONFIRMED)
+                .build();
+
+        MatchDisputeResolutionDTO dto = MatchDisputeResolutionDTO.builder()
+                .resolutionNote("no aplica")
+                .build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchService.resolveDispute(matchId, dto))
+                .isInstanceOf(InvalidMatchStateException.class);
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("resolveDispute: el ganador declarado debe ser participante del partido")
+    void resolveDispute_WinnerNotInMatch_ThrowsException() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+
+        Match match = Match.builder()
+                .id(matchId)
+                .player1(p1)
+                .player2(p2)
+                .status(MatchStatus.DISPUTED)
+                .disputeReason("motivo")
+                .build();
+
+        MatchDisputeResolutionDTO dto = MatchDisputeResolutionDTO.builder()
+                .winnerId(999L)
+                .resolutionNote("resolución")
+                .build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+
+        assertThatThrownBy(() -> matchService.resolveDispute(matchId, dto))
+                .isInstanceOf(InvalidMatchStateException.class);
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("shouldCancelMatchWhenParticipantRequests")
     void shouldCancelMatchWhenParticipantRequests() {
         // Arrange

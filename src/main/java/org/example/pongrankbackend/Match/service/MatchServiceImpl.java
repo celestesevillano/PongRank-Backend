@@ -440,6 +440,43 @@ public class MatchServiceImpl implements MatchService {
 
     @Override
     @Transactional
+    public MatchDetailResponseDTO resolveDispute(Long matchId, MatchDisputeResolutionDTO dto) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
+
+        if (match.getStatus() != MatchStatus.DISPUTED) {
+            throw new InvalidMatchStateException("Solo se puede resolver un partido que está en disputa");
+        }
+
+        match.setDisputeReason(match.getDisputeReason() + " | Resolución del administrador: " + dto.getResolutionNote());
+
+        if (dto.getWinnerId() == null) {
+            match.setStatus(MatchStatus.CANCELLED);
+            Match savedMatch = matchRepository.save(match);
+            return toDetailResponseDTO(savedMatch);
+        }
+
+        boolean isP1 = match.getPlayer1().getId().equals(dto.getWinnerId());
+        boolean isP2 = match.getPlayer2() != null && match.getPlayer2().getId().equals(dto.getWinnerId());
+        if (!isP1 && !isP2) {
+            throw new InvalidMatchStateException("El jugador ganador indicado no participa en este partido");
+        }
+
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setWinner(isP1 ? match.getPlayer1() : match.getPlayer2());
+        match.setConfirmedAt(LocalDateTime.now());
+        Match savedMatch = matchRepository.save(match);
+
+        eventPublisher.publishEvent(new MatchConfirmedEvent(this, savedMatch.getId(), isP1));
+
+        MatchDetailResponseDTO detailDTO = toDetailResponseDTO(savedMatch);
+        webSocketNotifier.notifyMatchConfirmed(savedMatch.getId(), toResponseDTO(savedMatch));
+
+        return detailDTO;
+    }
+
+    @Override
+    @Transactional
     public MatchResponseDTO cancelMatch(Long matchId, Long actingPlayerId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
