@@ -12,6 +12,7 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +37,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,10 +59,18 @@ class ClubMembershipServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
+    private org.example.pongrankbackend.Membership.service.MembershipService membershipService;
+
+    @Mock
     private ModelMapper modelMapper;
 
     @InjectMocks
     private ClubMembershipServiceImpl clubMembershipService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(membershipService.isPaidMember(anyLong())).thenReturn(true);
+    }
 
     private Player player(Long id) {
         return Player.builder().id(id).name("Jugador " + id).build();
@@ -142,6 +152,20 @@ class ClubMembershipServiceImplTest {
 
         assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
                 .isInstanceOf(ConflictException.class);
+
+        verify(clubMembershipRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestMembership: un jugador FREEMIUM no puede unirse a un club")
+    void requestMembership_FreemiumPlan_ThrowsException() {
+        actingAs(PLAYER_ID);
+        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
+        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
+        when(membershipService.isPaidMember(PLAYER_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.PlanRestrictionException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }

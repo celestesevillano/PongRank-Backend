@@ -13,7 +13,9 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.security.SecurityUtils;
@@ -32,15 +34,18 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     private final ClubMembershipRepository clubMembershipRepository;
     private final ClubRepository clubRepository;
     private final PlayerRepository playerRepository;
+    private final MembershipService membershipService;
     private final ModelMapper modelMapper;
 
     public ClubMembershipServiceImpl(ClubMembershipRepository clubMembershipRepository,
                                      ClubRepository clubRepository,
                                      PlayerRepository playerRepository,
+                                     MembershipService membershipService,
                                      ModelMapper modelMapper) {
         this.clubMembershipRepository = clubMembershipRepository;
         this.clubRepository = clubRepository;
         this.playerRepository = playerRepository;
+        this.membershipService = membershipService;
         this.modelMapper = modelMapper;
     }
 
@@ -52,6 +57,10 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + actingPlayerId));
         Club club = findClubById(dto.getClubId());
         validateClubIsApproved(club);
+
+        if (!membershipService.isPaidMember(actingPlayerId)) {
+            throw new PlanRestrictionException("El plan FREEMIUM no puede unirse a un club; actualiza tu plan a BASIC o superior");
+        }
 
         if (clubMembershipRepository.existsByPlayerIdAndStatusIn(actingPlayerId, ClubMembershipStatus.ACTIVE_STATUSES)) {
             throw new ConflictException("El jugador ya pertenece a un club o tiene una solicitud pendiente");

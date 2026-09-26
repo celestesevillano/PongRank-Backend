@@ -12,4 +12,6 @@ public interface EmailService {
     void sendPasswordResetEmail(Player player, String resetLink, int expirationMinutes);
 
     void sendPaymentConfirmationEmail(Player player, MembershipPlan plan, BigDecimal amount, String transactionId);
+
+    void sendAccountDeletedEmail(Player player, MembershipPlan plan);
 }

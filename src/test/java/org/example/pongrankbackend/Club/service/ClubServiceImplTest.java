@@ -18,6 +18,7 @@ import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,6 +76,11 @@ class ClubServiceImplTest {
 
     @InjectMocks
     private ClubServiceImpl clubService;
+
+    @BeforeEach
+    void setUp() {
+        org.springframework.test.util.ReflectionTestUtils.setField(clubService, "maxAdministeredEnterprise", 1);
+    }
 
     private Player player(Long id, Role role) {
         return Player.builder().id(id).name("Jugador " + id).role(role).build();
@@ -344,6 +350,7 @@ class ClubServiceImplTest {
         ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
 
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(membershipService.canCreateClub(OTHER_PLAYER_ID)).thenReturn(true);
         when(clubMembershipService.transferAdminRole(club, OTHER_PLAYER_ID)).thenReturn(newAdmin);
 
         clubService.transferAdministration(CLUB_ID, dto);
@@ -371,6 +378,24 @@ class ClubServiceImplTest {
     }
 
     @Test
+    @DisplayName("transferAdministration: no transfiere a un jugador sin plan ENTERPRISE")
+    void transferAdministration_NewAdminNotEnterprisePlan_ThrowsException() {
+        actingAs(ADMIN_ID, Role.ROLE_USER);
+        Club club = club(ClubStatus.APPROVED);
+        ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
+
+        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(membershipService.canCreateClub(OTHER_PLAYER_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID, dto))
+                .isInstanceOf(PlanRestrictionException.class)
+                .hasMessageContaining("ENTERPRISE");
+
+        verify(clubMembershipService, never()).transferAdminRole(any(), any());
+        assertThat(club.getAdmin().getId()).isEqualTo(ADMIN_ID);
+    }
+
+    @Test
     @DisplayName("transferAdministration: un club que no está APPROVED no transfiere su administración")
     void transferAdministration_ClubNotApproved_ThrowsException() {
         actingAs(ADMIN_ID, Role.ROLE_USER);
@@ -387,11 +412,11 @@ class ClubServiceImplTest {
         actingAs(ADMIN_ID, Role.ROLE_USER);
         Club club = club(ClubStatus.REJECTED);
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
-        when(clubRepository.existsByAdminIdAndStatusInAndIdNot(ADMIN_ID, ClubStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(true);
+        when(clubRepository.countByAdminIdAndStatusInAndIdNot(ADMIN_ID, ClubStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(1L);
 
         assertThatThrownBy(() -> clubService.resubmitClub(CLUB_ID, new ClubResubmitRequestDTO()))
                 .isInstanceOf(ConflictException.class)
-                .hasMessageContaining("administra otro club");
+                .hasMessageContaining("máximo");
         assertThat(club.getStatus()).isEqualTo(ClubStatus.REJECTED);
     }
 
