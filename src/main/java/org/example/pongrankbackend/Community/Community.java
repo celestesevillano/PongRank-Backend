@@ -8,7 +8,6 @@ import lombok.*;
 import org.example.pongrankbackend.CommunityMembership.CommunityMembership;
 import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.Player.Player;
-import org.example.pongrankbackend.Tournament.Tournament;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -65,10 +64,6 @@ public class Community {
     @Builder.Default
     @OneToMany(mappedBy = "community", fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     private List<CommunityMembership> memberships = new ArrayList<>();
-
-    @Builder.Default
-    @OneToMany(mappedBy = "community", fetch = FetchType.LAZY)
-    private List<Tournament> tournaments = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "community", fetch = FetchType.LAZY)

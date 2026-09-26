@@ -6,7 +6,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.example.pongrankbackend.Club.Club;
-import org.example.pongrankbackend.Community.Community;
 import org.example.pongrankbackend.Match.MatchFormat;
 import org.example.pongrankbackend.Player.Player;
 
@@ -34,12 +33,6 @@ public class Tournament {
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "club_id", nullable = false)
     private Club club;
-
-    // DEPRECATED: only APPROVED clubs organize tournaments. Kept because Community.tournaments (Community module)
-    // uses mappedBy = "community". Never set by TournamentService; remove together with Community's mapping.
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "community_id")
-    private Community community;
 
     @NotNull
     @Enumerated(EnumType.STRING)
