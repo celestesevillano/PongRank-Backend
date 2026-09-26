@@ -154,7 +154,7 @@ flowchart LR
     CO -.error.-> G[GlobalExceptionHandler]
 ```
 
-Requiere Java 21, Maven 3.9+ y PostgreSQL 14+ (o Docker Compose). Copiar `.env.example` a `.env`. **Obligatorias**: `JWT_SECRET` (base64 de 256 bits), `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_PUBLIC_KEY`. **Opcionales**: las tres `SPRING_DATASOURCE_*`, `JWT_EXPIRATION`, `JWT_REFRESH_EXPIRATION` y `CORS_ALLOWED_ORIGINS`.
+Requiere Java 21, Maven 3.9+ y PostgreSQL 14+ (o Docker Compose). Copiar `.env.example` a `.env`. **Obligatorias**: `JWT_SECRET` (base64, 256 bits), `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_PUBLIC_KEY`. **Opcionales**: `SPRING_DATASOURCE_*`, `JWT_EXPIRATION`, `JWT_REFRESH_EXPIRATION` y `CORS_ALLOWED_ORIGINS`.
 
 ```bash
 git clone https://github.com/celestesevillano/PongRank-Backend.git
@@ -162,9 +162,9 @@ cd PongRank-Backend && docker compose up -d
 cp .env.example .env && ./mvnw spring-boot:run
 ```
 
-La API queda en `http://localhost:8080`. La colección **`postman_collection.json`** está en la raíz, con los **80 endpoints** documentados por módulo, variables definidas y autorización Bearer de colección: basta ejecutar *Login* y el token se guarda solo.
+La API queda en `http://localhost:8080`. La colección **`postman_collection.json`** está en la raíz, con los **80 endpoints** documentados, variables y autorización Bearer: basta ejecutar *Login* y el token se guarda solo.
 
-Rutas base bajo `/api/v1`: `auth` (6 operaciones), `players` (5), `friendships` (5), `communities` (11), `matches` y `match-sets` (13), `clubs`, `club-memberships` y `admin/clubs` (20), `tournaments` (14), `training-sessions` (3) y `payments` (3).
+Rutas base bajo `/api/v1`: `auth` (6, incluye `/forgot-password` y `/reset-password`), `players` (5, incluye `DELETE /players/me`), `friendships` (5), `communities` (11), `matches` y `match-sets` (13, incluye `GET /matches/open` y `POST /{id}/join`), `clubs`, `club-memberships` y `admin/clubs` (20), `tournaments` (14), `training-sessions` (3) y `payments` (3).
 
 ## 10. Conclusión
 
@@ -172,7 +172,7 @@ Rutas base bajo `/api/v1`: `auth` (6 operaciones), `players` (5), `friendships` 
 
 **Aprendizajes.** *Las reglas de negocio se rompen bajo concurrencia*: "una comunidad nunca puede quedarse sin administradores" parecía resuelta con una validación simple, hasta analizar qué pasa si dos salen a la vez; detectar esas condiciones de carrera y resolverlas con bloqueo pesimista fue lo más valioso. *El borrado físico rara vez es la respuesta*, porque habría roto la integridad referencial con los partidos jugados. *Los DTOs no son burocracia*: exponer la entidad habría filtrado el hash de las contraseñas. *Desacoplar con eventos escala mejor* que encadenar llamadas entre servicios.
 
-**Trabajo futuro.** Documentación OpenAPI/Swagger con springdoc; paginación en jugadores y amistades; almacenamiento en S3; tests de integración con TestContainers; y una app móvil que consuma esta API con captura de métricas vía MediaPipe.
+**Trabajo futuro.** Documentación OpenAPI/Swagger con springdoc; paginación en jugadores y amistades; almacenamiento en S3; tests de integración con TestContainers; y una app móvil que consuma esta API con MediaPipe.
 
 ## 11. Apéndices
 
