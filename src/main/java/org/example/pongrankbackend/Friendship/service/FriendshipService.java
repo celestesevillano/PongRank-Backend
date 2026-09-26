@@ -13,6 +13,10 @@ public interface FriendshipService {
 
     FriendshipResponseDTO rejectFriendRequest(Long friendshipId, Long actingPlayerId);
 
+    void cancelFriendRequest(Long friendshipId, Long actingPlayerId);
+
+    void unfriend(Long friendshipId, Long actingPlayerId);
+
     List<FriendshipResponseDTO> getAcceptedFriends(Long playerId);
 
     List<FriendshipResponseDTO> getPendingRequests(Long playerId);
