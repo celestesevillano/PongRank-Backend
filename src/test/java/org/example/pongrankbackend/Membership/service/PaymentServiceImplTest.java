@@ -166,7 +166,7 @@ class PaymentServiceImplTest {
             assertThat(transaction.getStatus()).isEqualTo(PaymentStatus.APPROVED);
             assertThat(transaction.getMercadoPagoPaymentId()).isEqualTo("999");
             verify(membershipService).activatePaidMembership(membership);
-            verify(paymentTransactionRepository).save(transaction);
+            verify(paymentTransactionRepository).saveAndFlush(transaction);
         }
     }
 
@@ -215,6 +215,78 @@ class PaymentServiceImplTest {
             verify(membershipService, never()).activatePaidMembership(any());
             verify(paymentTransactionRepository, never()).save(any());
         }
+    }
+
+    @Test
+    @DisplayName("processWebhookNotification: si otra entrega concurrente del webhook ya actualizó la transacción, se ignora sin relanzar")
+    void processWebhookNotification_ConcurrentDelivery_IsIgnored() throws MPException, MPApiException {
+        Membership membership = Membership.builder().id(3L).status(MembershipStatus.PENDING).build();
+        PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.PENDING).build();
+        when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
+        when(paymentTransactionRepository.saveAndFlush(any(PaymentTransaction.class)))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(PaymentTransaction.class, 42L));
+
+        Payment fakePayment = mock(Payment.class);
+        when(fakePayment.getExternalReference()).thenReturn("42");
+        when(fakePayment.getStatus()).thenReturn("approved");
+
+        try (MockedConstruction<PaymentClient> mocked = mockConstruction(PaymentClient.class, (mockClient, context) -> {
+            try {
+                when(mockClient.get(anyLong())).thenReturn(fakePayment);
+            } catch (MPException | MPApiException e) {
+                throw new RuntimeException(e);
+            }
+        })) {
+            paymentService.processWebhookNotification("999");
+
+            verify(membershipService, never()).activatePaidMembership(any());
+        }
+    }
+
+    // ----- isValidWebhookSignature -----
+
+    @Test
+    @DisplayName("isValidWebhookSignature: sin secreto configurado, se omite la verificación (permite)")
+    void isValidWebhookSignature_NoSecretConfigured_ReturnsTrue() {
+        ReflectionTestUtils.setField(paymentService, "webhookSecret", "");
+
+        assertThat(paymentService.isValidWebhookSignature(null, null, "999")).isTrue();
+    }
+
+    @Test
+    @DisplayName("isValidWebhookSignature: firma calculada correctamente con el secreto es válida")
+    void isValidWebhookSignature_ValidSignature_ReturnsTrue() throws Exception {
+        ReflectionTestUtils.setField(paymentService, "webhookSecret", "mi-secreto");
+        String dataId = "999";
+        String requestId = "req-1";
+        String ts = "1700000000";
+        String manifest = "id:" + dataId + ";request-id:" + requestId + ";ts:" + ts + ";";
+
+        javax.crypto.Mac hmac = javax.crypto.Mac.getInstance("HmacSHA256");
+        hmac.init(new javax.crypto.spec.SecretKeySpec("mi-secreto".getBytes(), "HmacSHA256"));
+        byte[] hash = hmac.doFinal(manifest.getBytes());
+        StringBuilder hex = new StringBuilder();
+        for (byte b : hash) hex.append(String.format("%02x", b));
+
+        String xSignature = "ts=" + ts + ",v1=" + hex;
+
+        assertThat(paymentService.isValidWebhookSignature(xSignature, requestId, dataId)).isTrue();
+    }
+
+    @Test
+    @DisplayName("isValidWebhookSignature: firma con secreto incorrecto es inválida")
+    void isValidWebhookSignature_WrongSignature_ReturnsFalse() {
+        ReflectionTestUtils.setField(paymentService, "webhookSecret", "mi-secreto");
+
+        assertThat(paymentService.isValidWebhookSignature("ts=1700000000,v1=abc123", "req-1", "999")).isFalse();
+    }
+
+    @Test
+    @DisplayName("isValidWebhookSignature: header ausente con secreto configurado es inválido")
+    void isValidWebhookSignature_MissingHeader_ReturnsFalse() {
+        ReflectionTestUtils.setField(paymentService, "webhookSecret", "mi-secreto");
+
+        assertThat(paymentService.isValidWebhookSignature(null, "req-1", "999")).isFalse();
     }
 
     @Test

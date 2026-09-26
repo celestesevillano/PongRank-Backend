@@ -19,16 +19,26 @@ import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.email.service.EmailService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Transactional(readOnly = true)
 public class PaymentServiceImpl implements PaymentService {
+
+    private static final Logger log = LoggerFactory.getLogger(PaymentServiceImpl.class);
 
     private final MembershipService membershipService;
     private final PaymentTransactionRepository paymentTransactionRepository;
@@ -36,6 +46,11 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Value("${mercadopago.webhook-url}")
     private String webhookUrl;
+
+    // Secreto de la firma del webhook, configurado en el panel de MercadoPago (Notificaciones -> Webhooks).
+    // Vacío en dev/local si no se configuró; en ese caso se loguea advertencia y no se bloquea la notificación.
+    @Value("${mercadopago.webhook-secret:}")
+    private String webhookSecret;
 
     @Value("${membership.basic.price}")
     private BigDecimal basicPrice;
@@ -128,13 +143,61 @@ public class PaymentServiceImpl implements PaymentService {
 
         transaction.setMercadoPagoPaymentId(paymentId);
         transaction.setStatus(mapMercadoPagoStatus(payment.getStatus()));
-        paymentTransactionRepository.save(transaction);
+        try {
+            paymentTransactionRepository.saveAndFlush(transaction);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            // Otra entrega concurrente del mismo webhook ya está procesando esta transacción; no hay nada más que hacer
+            log.info("Notificación de MercadoPago duplicada/concurrente para la transacción {}, se ignora", transactionId);
+            return;
+        }
 
         if (transaction.getStatus() == PaymentStatus.APPROVED) {
             Membership membership = transaction.getMembership();
             membershipService.activatePaidMembership(membership);
             emailService.sendPaymentConfirmationEmail(
                     membership.getPlayer(), membership.getPlan(), transaction.getAmount(), transaction.getId().toString());
+        }
+    }
+
+    @Override
+    public boolean isValidWebhookSignature(String xSignature, String xRequestId, String dataId) {
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            log.warn("mercadopago.webhook-secret no está configurado; se omite la verificación de firma del webhook");
+            return true;
+        }
+        if (xSignature == null || xSignature.isBlank() || dataId == null || dataId.isBlank()) {
+            return false;
+        }
+
+        Map<String, String> parts = new HashMap<>();
+        for (String part : xSignature.split(",")) {
+            String[] keyValue = part.split("=", 2);
+            if (keyValue.length == 2) {
+                parts.put(keyValue[0].trim(), keyValue[1].trim());
+            }
+        }
+        String ts = parts.get("ts");
+        String v1 = parts.get("v1");
+        if (ts == null || v1 == null) {
+            return false;
+        }
+
+        String manifest = "id:" + dataId.toLowerCase() + ";" +
+                "request-id:" + (xRequestId == null ? "" : xRequestId) + ";" +
+                "ts:" + ts + ";";
+
+        try {
+            Mac hmac = Mac.getInstance("HmacSHA256");
+            hmac.init(new SecretKeySpec(webhookSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            byte[] hash = hmac.doFinal(manifest.getBytes(StandardCharsets.UTF_8));
+            StringBuilder hex = new StringBuilder();
+            for (byte b : hash) {
+                hex.append(String.format("%02x", b));
+            }
+            return hex.toString().equals(v1);
+        } catch (Exception e) {
+            log.error("Error validando la firma del webhook de MercadoPago", e);
+            return false;
         }
     }
 

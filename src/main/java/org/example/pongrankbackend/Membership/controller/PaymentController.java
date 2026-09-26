@@ -37,9 +37,16 @@ public class PaymentController {
     }
 
     @PostMapping("/webhook")
-    public ResponseEntity<Void> webhook(@RequestBody MercadoPagoWebhookPayloadDTO payload) {
+    public ResponseEntity<Void> webhook(
+            @RequestBody MercadoPagoWebhookPayloadDTO payload,
+            @RequestHeader(value = "x-signature", required = false) String xSignature,
+            @RequestHeader(value = "x-request-id", required = false) String xRequestId) {
         if ("payment".equals(payload.getType()) && payload.getData() != null) {
-            paymentService.processWebhookNotification(payload.getData().getId());
+            String dataId = payload.getData().getId();
+            if (!paymentService.isValidWebhookSignature(xSignature, xRequestId, dataId)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+            }
+            paymentService.processWebhookNotification(dataId);
         }
         return ResponseEntity.ok().build();
     }
