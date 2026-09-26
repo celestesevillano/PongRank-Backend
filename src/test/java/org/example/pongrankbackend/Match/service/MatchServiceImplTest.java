@@ -187,7 +187,7 @@ class MatchServiceImplTest {
 
         when(matchRepository.findById(30L)).thenReturn(Optional.of(openMatch));
         when(playerRepository.findById(joinerId)).thenReturn(Optional.of(joiner));
-        when(matchRepository.save(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(matchRepository.saveAndFlush(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
         stubModelMapper(creator);
         stubModelMapper(joiner);
 
@@ -197,6 +197,27 @@ class MatchServiceImplTest {
         assertThat(openMatch.getPlayer2()).isEqualTo(joiner);
         verify(matchRuleValidator).validateRatingGap(creator, joiner);
         verify(webSocketNotifier).notifyMatchJoined(eq(1L), eq(result));
+    }
+
+    @Test
+    @DisplayName("joinOpenMatch: si otro jugador tomó el cupo casi al mismo tiempo, lanza ConflictException")
+    void joinOpenMatch_ConcurrentJoin_ThrowsConflictException() {
+        Long joinerId = 2L;
+        Player creator = createPlayer(1L, "Alice");
+        Player joiner = createPlayer(joinerId, "Bob");
+        Match openMatch = Match.builder().id(30L).player1(creator).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED)
+                .latitude(new java.math.BigDecimal("-12.0")).longitude(new java.math.BigDecimal("-77.0")).build();
+        MatchJoinRequestDTO dto = MatchJoinRequestDTO.builder()
+                .latitude(new java.math.BigDecimal("-12.001")).longitude(new java.math.BigDecimal("-77.001")).build();
+
+        when(matchRepository.findById(30L)).thenReturn(Optional.of(openMatch));
+        when(playerRepository.findById(joinerId)).thenReturn(Optional.of(joiner));
+        when(matchRepository.saveAndFlush(any(Match.class)))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(Match.class, 30L));
+
+        assertThatThrownBy(() -> matchService.joinOpenMatch(joinerId, 30L, dto))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.ConflictException.class);
     }
 
     @Test
@@ -387,7 +408,7 @@ class MatchServiceImplTest {
         when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
         when(matchRuleValidator.validateSetScoresAndDetermineWinner(MatchFormat.BO3, setDtos))
                 .thenReturn(validationResult);
-        when(matchRepository.save(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(matchRepository.saveAndFlush(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
         stubModelMapper(p1);
         stubModelMapper(p2);
 
@@ -401,6 +422,45 @@ class MatchServiceImplTest {
         assertThat(match.getSets()).hasSize(2);
 
         verify(webSocketNotifier).notifyScoreSubmitted(eq(matchId), eq(p2.getId()), any(MatchResponseDTO.class));
+    }
+
+    @Test
+    @DisplayName("submitScore: si el partido cambió mientras se enviaba el marcador, lanza ConflictException")
+    void submitScore_ConcurrentSubmit_ThrowsConflictException() {
+        Long matchId = 1L;
+        Player p1 = createPlayer(1L, "Alice");
+        Player p2 = createPlayer(2L, "Bob");
+
+        Match match = Match.builder()
+                .id(matchId)
+                .player1(p1)
+                .player2(p2)
+                .format(MatchFormat.BO3)
+                .status(MatchStatus.CREATED)
+                .sets(new ArrayList<>())
+                .build();
+
+        List<MatchSetRequestDTO> setDtos = List.of(
+                MatchSetRequestDTO.builder().setNumber(1).scorePlayer1(11).scorePlayer2(7).build(),
+                MatchSetRequestDTO.builder().setNumber(2).scorePlayer1(11).scorePlayer2(9).build()
+        );
+        MatchScoreSubmitDTO submitDTO = MatchScoreSubmitDTO.builder().sets(setDtos).build();
+
+        MatchRuleValidator.MatchValidationResult validationResult = MatchRuleValidator.MatchValidationResult.builder()
+                .winnerPlayerNumber(1)
+                .setsWonPlayer1(2)
+                .setsWonPlayer2(0)
+                .scoreSummary("2 - 0")
+                .build();
+
+        when(matchRepository.findById(matchId)).thenReturn(Optional.of(match));
+        when(matchRuleValidator.validateSetScoresAndDetermineWinner(MatchFormat.BO3, setDtos))
+                .thenReturn(validationResult);
+        when(matchRepository.saveAndFlush(any(Match.class)))
+                .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(Match.class, matchId));
+
+        assertThatThrownBy(() -> matchService.submitScore(matchId, p1.getId(), submitDTO))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.ConflictException.class);
     }
 
     @Test

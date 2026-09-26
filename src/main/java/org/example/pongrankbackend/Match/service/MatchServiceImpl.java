@@ -28,6 +28,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -172,7 +173,12 @@ public class MatchServiceImpl implements MatchService {
         }
 
         match.setPlayer2(joiner);
-        Match savedMatch = matchRepository.save(match);
+        Match savedMatch;
+        try {
+            savedMatch = matchRepository.saveAndFlush(match);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ConflictException("Este partido libre ya fue tomado por otro jugador, intenta con otro");
+        }
         MatchResponseDTO responseDTO = toResponseDTO(savedMatch);
 
         webSocketNotifier.notifyMatchJoined(match.getPlayer1().getId(), responseDTO);
@@ -334,7 +340,12 @@ public class MatchServiceImpl implements MatchService {
         // Actualizar estado según quién propuso el marcador
         MatchStatus proposedStatus = isP1 ? MatchStatus.PROPOSED_P1 : MatchStatus.PROPOSED_P2;
         match.setStatus(proposedStatus);
-        Match updatedMatch = matchRepository.save(match);
+        Match updatedMatch;
+        try {
+            updatedMatch = matchRepository.saveAndFlush(match);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ConflictException("El partido cambió mientras enviabas el marcador; actualízalo y vuelve a intentar");
+        }
 
         MatchDetailResponseDTO detailDTO = toDetailResponseDTO(updatedMatch);
 
