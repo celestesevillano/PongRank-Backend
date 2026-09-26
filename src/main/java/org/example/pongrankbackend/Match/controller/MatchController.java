@@ -130,6 +130,15 @@ public class MatchController {
         return ResponseEntity.ok(response);
     }
 
+    @PutMapping("/{matchId}/resolve-dispute")
+    @PreAuthorize("hasRole('SYSTEM_ADMIN') or hasAuthority('ROLE_SYSTEM_ADMIN')")
+    public ResponseEntity<MatchDetailResponseDTO> resolveDispute(
+            @PathVariable Long matchId,
+            @Valid @RequestBody MatchDisputeResolutionDTO dto) {
+        MatchDetailResponseDTO response = matchService.resolveDispute(matchId, dto);
+        return ResponseEntity.ok(response);
+    }
+
     @PutMapping("/{matchId}/cancel")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<MatchResponseDTO> cancelMatch(

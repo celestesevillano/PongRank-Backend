@@ -28,6 +28,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -172,7 +173,12 @@ public class MatchServiceImpl implements MatchService {
         }
 
         match.setPlayer2(joiner);
-        Match savedMatch = matchRepository.save(match);
+        Match savedMatch;
+        try {
+            savedMatch = matchRepository.saveAndFlush(match);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ConflictException("Este partido libre ya fue tomado por otro jugador, intenta con otro");
+        }
         MatchResponseDTO responseDTO = toResponseDTO(savedMatch);
 
         webSocketNotifier.notifyMatchJoined(match.getPlayer1().getId(), responseDTO);
@@ -334,7 +340,12 @@ public class MatchServiceImpl implements MatchService {
         // Actualizar estado según quién propuso el marcador
         MatchStatus proposedStatus = isP1 ? MatchStatus.PROPOSED_P1 : MatchStatus.PROPOSED_P2;
         match.setStatus(proposedStatus);
-        Match updatedMatch = matchRepository.save(match);
+        Match updatedMatch;
+        try {
+            updatedMatch = matchRepository.saveAndFlush(match);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ConflictException("El partido cambió mientras enviabas el marcador; actualízalo y vuelve a intentar");
+        }
 
         MatchDetailResponseDTO detailDTO = toDetailResponseDTO(updatedMatch);
 
@@ -434,6 +445,43 @@ public class MatchServiceImpl implements MatchService {
 
         // Notificar en tiempo real la disputa
         webSocketNotifier.notifyMatchDisputed(savedMatch.getId(), dto.getReason(), toResponseDTO(savedMatch));
+
+        return detailDTO;
+    }
+
+    @Override
+    @Transactional
+    public MatchDetailResponseDTO resolveDispute(Long matchId, MatchDisputeResolutionDTO dto) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
+
+        if (match.getStatus() != MatchStatus.DISPUTED) {
+            throw new InvalidMatchStateException("Solo se puede resolver un partido que está en disputa");
+        }
+
+        match.setDisputeReason(match.getDisputeReason() + " | Resolución del administrador: " + dto.getResolutionNote());
+
+        if (dto.getWinnerId() == null) {
+            match.setStatus(MatchStatus.CANCELLED);
+            Match savedMatch = matchRepository.save(match);
+            return toDetailResponseDTO(savedMatch);
+        }
+
+        boolean isP1 = match.getPlayer1().getId().equals(dto.getWinnerId());
+        boolean isP2 = match.getPlayer2() != null && match.getPlayer2().getId().equals(dto.getWinnerId());
+        if (!isP1 && !isP2) {
+            throw new InvalidMatchStateException("El jugador ganador indicado no participa en este partido");
+        }
+
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setWinner(isP1 ? match.getPlayer1() : match.getPlayer2());
+        match.setConfirmedAt(LocalDateTime.now());
+        Match savedMatch = matchRepository.save(match);
+
+        eventPublisher.publishEvent(new MatchConfirmedEvent(this, savedMatch.getId(), isP1));
+
+        MatchDetailResponseDTO detailDTO = toDetailResponseDTO(savedMatch);
+        webSocketNotifier.notifyMatchConfirmed(savedMatch.getId(), toResponseDTO(savedMatch));
 
         return detailDTO;
     }

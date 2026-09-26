@@ -45,6 +45,9 @@ public interface MatchService {
 
     MatchDetailResponseDTO disputeMatch(Long matchId, Long actingPlayerId, MatchDisputeRequestDTO dto);
 
+    // Solo SYSTEM_ADMIN: resuelve un partido DISPUTED declarando ganador (confirma y recalcula rating) o anulándolo
+    MatchDetailResponseDTO resolveDispute(Long matchId, MatchDisputeResolutionDTO dto);
+
     MatchResponseDTO cancelMatch(Long matchId, Long actingPlayerId);
 
     MatchResponseDTO closeMatchAsWalkover(Long matchId, Long winnerId);
