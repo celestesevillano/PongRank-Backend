@@ -7,8 +7,8 @@ import org.example.pongrankbackend.TrainingSession.TrainingSession;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
+import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
-import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -43,7 +43,7 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
 
         if (!membershipService.hasCoachAccess(playerId)) {
-            throw new UnauthorizedActionException("Solo los jugadores con plan PRO o ENTERPRISE pueden usar el Coach");
+            throw new PlanRestrictionException("Solo los jugadores con plan PRO o ENTERPRISE pueden usar el Coach");
         }
 
         Double previousBest = trainingSessionRepository.findTopByPlayerIdOrderByPostureScoreDesc(playerId)

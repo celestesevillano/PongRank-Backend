@@ -22,6 +22,7 @@ import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
@@ -63,7 +64,7 @@ public class ClubServiceImpl implements ClubService {
         validateCanAdministerClub(requesterId, null);
 
         if (!membershipService.canCreateClub(requesterId)) {
-            throw new UnauthorizedActionException("Solo los jugadores con plan ENTERPRISE pueden crear un club");
+            throw new PlanRestrictionException("Solo los jugadores con plan ENTERPRISE pueden crear un club");
         }
 
         String normalizedName = dto.getName().trim();
