@@ -11,30 +11,30 @@ import org.example.pongrankbackend.Club.dto.ClubReviewResponseDTO;
 import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 
-
+// El jugador que actúa en cada operación se lee del SecurityContext (SecurityUtils), no se recibe como parámetro.
 public interface ClubService {
 
-    ClubResponseDTO registerClub(Long requesterId, ClubRegisterRequestDTO dto);
+    ClubResponseDTO registerClub(ClubRegisterRequestDTO dto);
 
     PageResponseDTO<ClubResponseDTO> getApprovedClubs(int page, int size);
 
     ClubResponseDTO getClubById(Long clubId);
 
-    ClubResponseDTO updateClub(Long clubId, Long actingPlayerId, ClubUpdateRequestDTO dto);
+    ClubResponseDTO updateClub(Long clubId, ClubUpdateRequestDTO dto);
 
-    ClubReviewResponseDTO getClubReview(Long clubId, Long actingPlayerId);
+    ClubReviewResponseDTO getClubReview(Long clubId);
 
-    ClubResponseDTO resubmitClub(Long clubId, Long actingPlayerId, ClubResubmitRequestDTO dto);
+    ClubResponseDTO resubmitClub(Long clubId, ClubResubmitRequestDTO dto);
 
-    ClubResponseDTO replaceAffiliationDocument(Long clubId, Long actingPlayerId, ClubAffiliationDocumentRequestDTO dto);
+    ClubResponseDTO replaceAffiliationDocument(Long clubId, ClubAffiliationDocumentRequestDTO dto);
 
-    ClubResponseDTO transferAdministration(Long clubId, Long actingPlayerId, ClubAdminTransferRequestDTO dto);
+    ClubResponseDTO transferAdministration(Long clubId, ClubAdminTransferRequestDTO dto);
 
-    PageResponseDTO<ClubReviewResponseDTO> getPendingClubs(Long actingPlayerId, int page, int size);
+    PageResponseDTO<ClubReviewResponseDTO> getPendingClubs(int page, int size);
 
-    ClubReviewResponseDTO approveClub(Long clubId, Long actingPlayerId);
+    ClubReviewResponseDTO approveClub(Long clubId);
 
-    ClubReviewResponseDTO rejectClub(Long clubId, Long actingPlayerId, ClubRejectRequestDTO dto);
+    ClubReviewResponseDTO rejectClub(Long clubId, ClubRejectRequestDTO dto);
 
-    PageResponseDTO<ClubReviewHistoryDTO> getReviewHistory(Long clubId, Long actingPlayerId, int page, int size);
+    PageResponseDTO<ClubReviewHistoryDTO> getReviewHistory(Long clubId, int page, int size);
 }

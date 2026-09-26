@@ -12,11 +12,9 @@ import org.example.pongrankbackend.Tournament.dto.TournamentWalkoverRequestDTO;
 import org.example.pongrankbackend.Tournament.service.TournamentService;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
-import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -33,10 +31,8 @@ public class TournamentController {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<TournamentResponseDTO> createTournament(
-            @AuthenticationPrincipal CustomUserDetails currentUser,
-            @Valid @RequestBody TournamentCreateRequestDTO dto) {
-        TournamentResponseDTO response = tournamentService.createTournament(currentUser.getId(), dto);
+    public ResponseEntity<TournamentResponseDTO> createTournament(@Valid @RequestBody TournamentCreateRequestDTO dto) {
+        TournamentResponseDTO response = tournamentService.createTournament(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -62,9 +58,8 @@ public class TournamentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentParticipantResponseDTO> addParticipant(
             @PathVariable Long tournamentId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentParticipantRequestDTO dto) {
-        TournamentParticipantResponseDTO response = tournamentService.addParticipant(tournamentId, currentUser.getId(), dto);
+        TournamentParticipantResponseDTO response = tournamentService.addParticipant(tournamentId, dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -72,9 +67,8 @@ public class TournamentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Void> removeParticipant(
             @PathVariable Long tournamentId,
-            @PathVariable Long playerId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        tournamentService.removeParticipant(tournamentId, playerId, currentUser.getId());
+            @PathVariable Long playerId) {
+        tournamentService.removeParticipant(tournamentId, playerId);
         return ResponseEntity.noContent().build();
     }
 
@@ -82,17 +76,14 @@ public class TournamentController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<TournamentParticipantResponseDTO>> updateSeeding(
             @PathVariable Long tournamentId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentOrderedPlayersRequestDTO dto) {
-        return ResponseEntity.ok(tournamentService.updateSeeding(tournamentId, currentUser.getId(), dto));
+        return ResponseEntity.ok(tournamentService.updateSeeding(tournamentId, dto));
     }
 
     @PostMapping("/{tournamentId}/start")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<TournamentResponseDTO> startTournament(
-            @PathVariable Long tournamentId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        return ResponseEntity.ok(tournamentService.startTournament(tournamentId, currentUser.getId()));
+    public ResponseEntity<TournamentResponseDTO> startTournament(@PathVariable Long tournamentId) {
+        return ResponseEntity.ok(tournamentService.startTournament(tournamentId));
     }
 
     @GetMapping("/{tournamentId}/matches")
@@ -110,18 +101,16 @@ public class TournamentController {
     public ResponseEntity<List<GroupStandingsResponseDTO>> resolveGroupTie(
             @PathVariable Long tournamentId,
             @PathVariable Integer groupNumber,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentOrderedPlayersRequestDTO dto) {
-        return ResponseEntity.ok(tournamentService.resolveGroupTie(tournamentId, groupNumber, currentUser.getId(), dto));
+        return ResponseEntity.ok(tournamentService.resolveGroupTie(tournamentId, groupNumber, dto));
     }
 
     @PostMapping("/{tournamentId}/knockout")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<TournamentResponseDTO> generateKnockout(
             @PathVariable Long tournamentId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @RequestParam(defaultValue = "false") boolean allowSameGroupMatches) {
-        return ResponseEntity.ok(tournamentService.generateKnockout(tournamentId, currentUser.getId(), allowSameGroupMatches));
+        return ResponseEntity.ok(tournamentService.generateKnockout(tournamentId, allowSameGroupMatches));
     }
 
     @PostMapping("/{tournamentId}/matches/{tournamentMatchId}/walkover")
@@ -129,16 +118,13 @@ public class TournamentController {
     public ResponseEntity<TournamentMatchResponseDTO> declareWalkover(
             @PathVariable Long tournamentId,
             @PathVariable Long tournamentMatchId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TournamentWalkoverRequestDTO dto) {
-        return ResponseEntity.ok(tournamentService.declareWalkover(tournamentId, tournamentMatchId, currentUser.getId(), dto));
+        return ResponseEntity.ok(tournamentService.declareWalkover(tournamentId, tournamentMatchId, dto));
     }
 
     @PostMapping("/{tournamentId}/sync-results")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<TournamentResponseDTO> syncMatchResults(
-            @PathVariable Long tournamentId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        return ResponseEntity.ok(tournamentService.syncMatchResults(tournamentId, currentUser.getId()));
+    public ResponseEntity<TournamentResponseDTO> syncMatchResults(@PathVariable Long tournamentId) {
+        return ResponseEntity.ok(tournamentService.syncMatchResults(tournamentId));
     }
 }

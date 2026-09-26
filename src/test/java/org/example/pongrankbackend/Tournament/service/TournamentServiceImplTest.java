@@ -28,6 +28,8 @@ import org.example.pongrankbackend.Tournament.integration.MatchOutcome;
 import org.example.pongrankbackend.Tournament.repository.TournamentMatchRepository;
 import org.example.pongrankbackend.Tournament.repository.TournamentParticipantRepository;
 import org.example.pongrankbackend.Tournament.repository.TournamentRepository;
+import org.example.pongrankbackend.security.CustomUserDetails;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +47,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.example.pongrankbackend.Tournament.dto.TournamentResponseDTO;
 
 import java.util.*;
@@ -112,14 +116,28 @@ class TournamentServiceImplTest {
         return StreamSupport.stream(iterable.spliterator(), false).toList();
     }
 
+    // Simula el JWT validado: pone al jugador dado como usuario autenticado actual
+    private void actingAs(Long playerId) {
+        CustomUserDetails userDetails = new CustomUserDetails(
+                Player.builder().id(playerId).name("Jugador " + playerId).role(org.example.pongrankbackend.Player.Role.ROLE_USER).build());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
     // ------------------------------------------------------------------ creation
 
     @Test
     @DisplayName("createTournament: un club PENDING o REJECTED no puede organizar torneos")
     void createTournament_ClubNotApproved_Throws() {
+        actingAs(ADMIN_ID);
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
 
-        assertThatThrownBy(() -> tournamentService.createTournament(ADMIN_ID, createDto()))
+        assertThatThrownBy(() -> tournamentService.createTournament(createDto()))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("APPROVED");
         verify(tournamentRepository, never()).save(any());
@@ -128,9 +146,10 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("createTournament: solo el administrador del club puede crear torneos")
     void createTournament_NotClubAdmin_Throws() {
+        actingAs(OUTSIDER_ID);
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
 
-        assertThatThrownBy(() -> tournamentService.createTournament(OUTSIDER_ID, createDto()))
+        assertThatThrownBy(() -> tournamentService.createTournament(createDto()))
                 .isInstanceOf(UnauthorizedActionException.class);
         verify(tournamentRepository, never()).save(any());
     }
@@ -138,11 +157,12 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("createTournament: crea el torneo OPEN vinculado al club y sin comunidad")
     void createTournament_Success() {
+        actingAs(ADMIN_ID);
         Club club = club(ClubStatus.APPROVED);
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
         when(tournamentRepository.save(any(Tournament.class))).thenAnswer(i -> i.getArgument(0));
 
-        tournamentService.createTournament(ADMIN_ID, createDto());
+        tournamentService.createTournament(createDto());
 
         ArgumentCaptor<Tournament> captor = ArgumentCaptor.forClass(Tournament.class);
         verify(tournamentRepository).save(captor.capture());
@@ -156,12 +176,13 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("addParticipant: un jugador INACTIVE o SUSPENDED no puede inscribirse")
     void addParticipant_InactivePlayer_Throws() {
+        actingAs(ADMIN_ID);
         Player suspended = player(5L, 1500);
         suspended.setStatus(PlayerStatus.SUSPENDED);
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(tournament(TournamentType.OPEN, TournamentStatus.OPEN)));
         when(playerRepository.findById(5L)).thenReturn(Optional.of(suspended));
 
-        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
+        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, new TournamentParticipantRequestDTO(5L)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("ACTIVE");
         verify(participantRepository, never()).saveAll(any());
@@ -170,11 +191,12 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("addParticipant: en un torneo INTERNAL solo se inscriben miembros activos del club")
     void addParticipant_InternalNonMember_Throws() {
+        actingAs(ADMIN_ID);
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(tournament(TournamentType.INTERNAL, TournamentStatus.OPEN)));
         when(playerRepository.findById(5L)).thenReturn(Optional.of(player(5L, 1500)));
         when(clubMembershipService.isActiveMember(CLUB_ID, 5L)).thenReturn(false);
 
-        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
+        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, new TournamentParticipantRequestDTO(5L)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("INTERNAL");
     }
@@ -182,13 +204,14 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("addParticipant: en un torneo OPEN se inscribe cualquier ACTIVE y no se crea membresía; siembra por rating")
     void addParticipant_OpenTournament_SeedsByRating() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.OPEN);
         TournamentParticipant existing = participant(t, player(3L, 1500), 1, null);
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(playerRepository.findById(5L)).thenReturn(Optional.of(player(5L, 1800)));
         when(participantRepository.findByTournamentIdOrderBySeedAsc(TOURNAMENT_ID)).thenReturn(List.of(existing));
 
-        tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L));
+        tournamentService.addParticipant(TOURNAMENT_ID, new TournamentParticipantRequestDTO(5L));
 
         assertThat(existing.getSeed()).isEqualTo(2);
         verify(clubMembershipService, never()).isActiveMember(any(), any());
@@ -198,11 +221,12 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("addParticipant: no permite participantes duplicados")
     void addParticipant_Duplicate_Throws() {
+        actingAs(ADMIN_ID);
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(tournament(TournamentType.OPEN, TournamentStatus.OPEN)));
         when(playerRepository.findById(5L)).thenReturn(Optional.of(player(5L, 1500)));
         when(participantRepository.existsByTournamentIdAndPlayerId(TOURNAMENT_ID, 5L)).thenReturn(true);
 
-        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
+        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, new TournamentParticipantRequestDTO(5L)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("ya está inscrito");
     }
@@ -210,9 +234,10 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("addParticipant: la lista queda cerrada una vez iniciado el torneo")
     void addParticipant_TournamentStarted_Throws() {
+        actingAs(ADMIN_ID);
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE)));
 
-        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, ADMIN_ID, new TournamentParticipantRequestDTO(5L)))
+        assertThatThrownBy(() -> tournamentService.addParticipant(TOURNAMENT_ID, new TournamentParticipantRequestDTO(5L)))
                 .isInstanceOf(ConflictException.class);
         verify(playerRepository, never()).findById(any());
     }
@@ -222,6 +247,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("startTournament: 5 participantes no permiten formar grupos de 3 o 4")
     void startTournament_FiveParticipants_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.OPEN);
         List<TournamentParticipant> five = new ArrayList<>();
         for (long id = 1; id <= 5; id++) {
@@ -230,7 +256,7 @@ class TournamentServiceImplTest {
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(participantRepository.findByTournamentIdOrderBySeedAsc(TOURNAMENT_ID)).thenReturn(five);
 
-        assertThatThrownBy(() -> tournamentService.startTournament(TOURNAMENT_ID, ADMIN_ID))
+        assertThatThrownBy(() -> tournamentService.startTournament(TOURNAMENT_ID))
                 .isInstanceOf(ConflictException.class);
         verify(matchIntegrationPort, never()).createMatch(any(), any(), any());
     }
@@ -238,6 +264,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("startTournament: no inicia si un participante dejó de estar ACTIVE")
     void startTournament_SuspendedParticipant_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.OPEN);
         List<TournamentParticipant> four = new ArrayList<>();
         for (long id = 1; id <= 4; id++) {
@@ -247,7 +274,7 @@ class TournamentServiceImplTest {
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(participantRepository.findByTournamentIdOrderBySeedAsc(TOURNAMENT_ID)).thenReturn(four);
 
-        assertThatThrownBy(() -> tournamentService.startTournament(TOURNAMENT_ID, ADMIN_ID))
+        assertThatThrownBy(() -> tournamentService.startTournament(TOURNAMENT_ID))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("retirarse");
         verify(matchIntegrationPort, never()).createMatch(any(), any(), any());
@@ -256,6 +283,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("startTournament: 4 participantes forman 1 grupo con 6 partidos todos contra todos")
     void startTournament_FourParticipants_CreatesRoundRobin() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.OPEN);
         List<TournamentParticipant> four = new ArrayList<>();
         for (long id = 1; id <= 4; id++) {
@@ -266,7 +294,7 @@ class TournamentServiceImplTest {
         when(matchIntegrationPort.createMatch(any(), any(), any())).thenAnswer(i -> new Match());
         when(tournamentRepository.save(t)).thenReturn(t);
 
-        tournamentService.startTournament(TOURNAMENT_ID, ADMIN_ID);
+        tournamentService.startTournament(TOURNAMENT_ID);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Iterable<TournamentMatch>> captor = ArgumentCaptor.forClass(Iterable.class);
@@ -288,6 +316,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("declareWalkover: el presente gana sin sets ni puntos inventados")
     void declareWalkover_Success() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Player p1 = player(11L, 1500);
         Player p2 = player(12L, 1500);
@@ -296,7 +325,7 @@ class TournamentServiceImplTest {
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
         when(tournamentMatchRepository.findById(500L)).thenReturn(Optional.of(match));
 
-        tournamentService.declareWalkover(TOURNAMENT_ID, 500L, ADMIN_ID, new TournamentWalkoverRequestDTO(11L));
+        tournamentService.declareWalkover(TOURNAMENT_ID, 500L, new TournamentWalkoverRequestDTO(11L));
 
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.WALKOVER);
         assertThat(match.getWinner()).isEqualTo(p2);
@@ -307,6 +336,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("declareWalkover: cuando tiene un Match real vinculado, lo cierra como WALKOVER a través del puerto")
     void declareWalkover_WithRealMatch_ClosesMatchAsWalkover() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Player p1 = player(11L, 1500);
         Player p2 = player(12L, 1500);
@@ -317,7 +347,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findById(500L)).thenReturn(Optional.of(match));
         when(matchIntegrationPort.hasReportedScore(real)).thenReturn(false);
 
-        tournamentService.declareWalkover(TOURNAMENT_ID, 500L, ADMIN_ID, new TournamentWalkoverRequestDTO(11L));
+        tournamentService.declareWalkover(TOURNAMENT_ID, 500L, new TournamentWalkoverRequestDTO(11L));
 
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.WALKOVER);
         assertThat(match.getWinner()).isEqualTo(p2);
@@ -327,6 +357,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("declareWalkover: no se permite si ya hay un marcador reportado en Match")
     void declareWalkover_ScoreAlreadyReported_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Match real = new Match();
         TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
@@ -336,7 +367,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findById(500L)).thenReturn(Optional.of(match));
         when(matchIntegrationPort.hasReportedScore(real)).thenReturn(true);
 
-        assertThatThrownBy(() -> tournamentService.declareWalkover(TOURNAMENT_ID, 500L, ADMIN_ID, new TournamentWalkoverRequestDTO(11L)))
+        assertThatThrownBy(() -> tournamentService.declareWalkover(TOURNAMENT_ID, 500L, new TournamentWalkoverRequestDTO(11L)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("marcador reportado");
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.SCHEDULED);
@@ -346,6 +377,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("syncMatchResults: rechaza un Match jugado por otros jugadores")
     void syncMatchResults_DifferentPlayers_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Match real = new Match();
         TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
@@ -355,7 +387,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 99L, 11L, 2, 0, 22, 10)));
 
-        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
+        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no coinciden");
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.SCHEDULED);
@@ -364,6 +396,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("syncMatchResults: si el Match tiene a los jugadores en orden inverso, los sets se reorientan")
     void syncMatchResults_SwappedPlayers_Reoriented() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Player p1 = player(11L, 1500);
         Match real = new Match();
@@ -375,7 +408,7 @@ class TournamentServiceImplTest {
         // In the Match, player1 is 12 and player2 is 11; player 11 wins 2-1
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(12L, 11L, 11L, 1, 2, 28, 31)));
 
-        tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID);
+        tournamentService.syncMatchResults(TOURNAMENT_ID);
 
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.COMPLETED);
         assertThat(match.getWinner()).isEqualTo(p1);
@@ -388,6 +421,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("syncMatchResults: rechaza un resultado cuyo ganador no juega el partido")
     void syncMatchResults_WinnerNotInMatch_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Match real = new Match();
         TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
@@ -397,7 +431,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 12L, 999L, 2, 0, 22, 10)));
 
-        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
+        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("Resultado inválido");
         assertThat(match.getStatus()).isEqualTo(TournamentMatchStatus.SCHEDULED);
@@ -406,6 +440,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("syncMatchResults: rechaza un resultado donde el ganador no tiene más sets")
     void syncMatchResults_WinnerWithoutMoreSets_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Match real = new Match();
         TournamentMatch match = TournamentMatch.builder().id(500L).tournament(t).stage(TournamentStage.GROUP)
@@ -415,13 +450,14 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(match));
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 12L, 11L, 1, 2, 30, 31)));
 
-        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID))
+        assertThatThrownBy(() -> tournamentService.syncMatchResults(TOURNAMENT_ID))
                 .isInstanceOf(ConflictException.class);
     }
 
     @Test
     @DisplayName("Llave: el ganador de una semifinal avanza a la final y la final se programa al tener ambos jugadores")
     void knockoutWinner_AdvancesAndSchedulesNextMatch() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.KNOCKOUT_STAGE);
         Player p1 = player(11L, 1500);
         Player p2 = player(12L, 1500);
@@ -442,7 +478,7 @@ class TournamentServiceImplTest {
                 .thenReturn(Optional.of(finalMatch));
         when(matchIntegrationPort.createMatch(p1, p4, MatchFormat.BO3)).thenReturn(new Match());
 
-        tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID);
+        tournamentService.syncMatchResults(TOURNAMENT_ID);
 
         assertThat(semifinal.getStatus()).isEqualTo(TournamentMatchStatus.COMPLETED);
         assertThat(semifinal.getWinner()).isEqualTo(p1);
@@ -454,6 +490,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("Llave: al confirmarse la final el torneo termina con su campeón")
     void finalResult_FinishesTournament() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.KNOCKOUT_STAGE);
         Player p1 = player(11L, 1500);
         Player p2 = player(12L, 1500);
@@ -465,7 +502,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findByTournamentIdOrderByIdAsc(TOURNAMENT_ID)).thenReturn(List.of(finalMatch));
         when(matchIntegrationPort.findConfirmedOutcome(real)).thenReturn(Optional.of(new MatchOutcome(11L, 12L, 12L, 1, 3, 40, 44)));
 
-        tournamentService.syncMatchResults(TOURNAMENT_ID, ADMIN_ID);
+        tournamentService.syncMatchResults(TOURNAMENT_ID);
 
         assertThat(t.getStatus()).isEqualTo(TournamentStatus.FINISHED);
         assertThat(t.getWinner()).isEqualTo(p2);
@@ -476,6 +513,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("generateKnockout: no se genera con partidos de grupo pendientes")
     void generateKnockout_GroupsNotFinished_Throws() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Player a = player(11L, 1500);
         Player b = player(12L, 1500);
@@ -488,7 +526,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findByTournamentIdAndStage(TOURNAMENT_ID, TournamentStage.GROUP))
                 .thenReturn(List.of(pending, completed(t, 1, a, c), completed(t, 1, b, c)));
 
-        assertThatThrownBy(() -> tournamentService.generateKnockout(TOURNAMENT_ID, ADMIN_ID, false))
+        assertThatThrownBy(() -> tournamentService.generateKnockout(TOURNAMENT_ID, false))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("finalizados");
     }
@@ -496,6 +534,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("generateKnockout: 2 grupos de 3 generan semifinales cruzadas (sin rivales del mismo grupo) y la final")
     void generateKnockout_TwoGroups_CrossedSemifinals() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Player s1 = player(1L, 1500), s2 = player(2L, 1500), s3 = player(3L, 1500);
         Player s4 = player(4L, 1500), s5 = player(5L, 1500), s6 = player(6L, 1500);
@@ -510,7 +549,7 @@ class TournamentServiceImplTest {
         when(matchIntegrationPort.createMatch(any(), any(), any())).thenAnswer(i -> new Match());
         when(tournamentRepository.save(t)).thenReturn(t);
 
-        tournamentService.generateKnockout(TOURNAMENT_ID, ADMIN_ID, false);
+        tournamentService.generateKnockout(TOURNAMENT_ID, false);
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Iterable<TournamentMatch>> captor = ArgumentCaptor.forClass(Iterable.class);
@@ -535,6 +574,7 @@ class TournamentServiceImplTest {
     @Test
     @DisplayName("generateKnockout: con un solo grupo informa del cruce inevitable antes de generar la llave")
     void generateKnockout_OneGroup_RequiresConfirmation() {
+        actingAs(ADMIN_ID);
         Tournament t = tournament(TournamentType.OPEN, TournamentStatus.GROUP_STAGE);
         Player a = player(11L, 1500), b = player(12L, 1500), c = player(13L, 1500);
         when(tournamentRepository.findById(TOURNAMENT_ID)).thenReturn(Optional.of(t));
@@ -543,7 +583,7 @@ class TournamentServiceImplTest {
         when(tournamentMatchRepository.findByTournamentIdAndStage(TOURNAMENT_ID, TournamentStage.GROUP)).thenReturn(List.of(
                 completed(t, 1, a, b), completed(t, 1, a, c), completed(t, 1, b, c)));
 
-        assertThatThrownBy(() -> tournamentService.generateKnockout(TOURNAMENT_ID, ADMIN_ID, false))
+        assertThatThrownBy(() -> tournamentService.generateKnockout(TOURNAMENT_ID, false))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("allowSameGroupMatches");
         verify(tournamentMatchRepository, never()).saveAll(any());

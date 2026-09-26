@@ -12,9 +12,10 @@ import org.example.pongrankbackend.Tournament.dto.TournamentWalkoverRequestDTO;
 
 import java.util.List;
 
+// El jugador que actúa se lee del SecurityContext (SecurityUtils), no se recibe como parámetro.
 public interface TournamentService {
 
-    TournamentResponseDTO createTournament(Long actingPlayerId, TournamentCreateRequestDTO dto);
+    TournamentResponseDTO createTournament(TournamentCreateRequestDTO dto);
 
     TournamentResponseDTO getTournamentById(Long tournamentId);
 
@@ -22,27 +23,27 @@ public interface TournamentService {
 
     List<TournamentParticipantResponseDTO> getParticipants(Long tournamentId);
 
-    TournamentParticipantResponseDTO addParticipant(Long tournamentId, Long actingPlayerId, TournamentParticipantRequestDTO dto);
+    TournamentParticipantResponseDTO addParticipant(Long tournamentId, TournamentParticipantRequestDTO dto);
 
-    void removeParticipant(Long tournamentId, Long playerId, Long actingPlayerId);
+    void removeParticipant(Long tournamentId, Long playerId);
 
-    List<TournamentParticipantResponseDTO> updateSeeding(Long tournamentId, Long actingPlayerId, TournamentOrderedPlayersRequestDTO dto);
+    List<TournamentParticipantResponseDTO> updateSeeding(Long tournamentId, TournamentOrderedPlayersRequestDTO dto);
 
-    TournamentResponseDTO startTournament(Long tournamentId, Long actingPlayerId);
+    TournamentResponseDTO startTournament(Long tournamentId);
 
     List<TournamentMatchResponseDTO> getMatches(Long tournamentId);
 
     List<GroupStandingsResponseDTO> getGroupStandings(Long tournamentId);
 
-    List<GroupStandingsResponseDTO> resolveGroupTie(Long tournamentId, Integer groupNumber, Long actingPlayerId,
+    List<GroupStandingsResponseDTO> resolveGroupTie(Long tournamentId, Integer groupNumber,
                                                     TournamentOrderedPlayersRequestDTO dto);
 
-    TournamentResponseDTO generateKnockout(Long tournamentId, Long actingPlayerId, boolean allowSameGroupMatches);
+    TournamentResponseDTO generateKnockout(Long tournamentId, boolean allowSameGroupMatches);
 
-    TournamentMatchResponseDTO declareWalkover(Long tournamentId, Long tournamentMatchId, Long actingPlayerId,
+    TournamentMatchResponseDTO declareWalkover(Long tournamentId, Long tournamentMatchId,
                                                TournamentWalkoverRequestDTO dto);
 
-    TournamentResponseDTO syncMatchResults(Long tournamentId, Long actingPlayerId);
+    TournamentResponseDTO syncMatchResults(Long tournamentId);
 
     // Called by TournamentMatchEventListener when the Match module publishes MatchConfirmedEvent (not exposed through HTTP)
     void applyConfirmedMatch(Long matchId);

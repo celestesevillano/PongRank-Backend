@@ -25,6 +25,7 @@ import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -56,10 +57,10 @@ public class ClubServiceImpl implements ClubService {
         this.modelMapper = modelMapper;
     }
 
-    // TODO: Replace requesterId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubResponseDTO registerClub(Long requesterId, ClubRegisterRequestDTO dto) {
+    public ClubResponseDTO registerClub(ClubRegisterRequestDTO dto) {
+        Long requesterId = SecurityUtils.getRequiredCurrentUserId();
         Player requester = findPlayerById(requesterId);
         validateCanAdministerClub(requesterId, null);
 
@@ -95,10 +96,10 @@ public class ClubServiceImpl implements ClubService {
         return modelMapper.map(club, ClubResponseDTO.class);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubResponseDTO updateClub(Long clubId, Long actingPlayerId, ClubUpdateRequestDTO dto) {
+    public ClubResponseDTO updateClub(Long clubId, ClubUpdateRequestDTO dto) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClubById(clubId);
         validateClubAdmin(club, actingPlayerId);
 
@@ -118,9 +119,9 @@ public class ClubServiceImpl implements ClubService {
         return modelMapper.map(updatedClub, ClubResponseDTO.class);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
-    public ClubReviewResponseDTO getClubReview(Long clubId, Long actingPlayerId) {
+    public ClubReviewResponseDTO getClubReview(Long clubId) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClubById(clubId);
 
         if (!isClubAdmin(club, actingPlayerId) && !isSystemAdmin(findPlayerById(actingPlayerId))) {
@@ -130,10 +131,10 @@ public class ClubServiceImpl implements ClubService {
         return modelMapper.map(club, ClubReviewResponseDTO.class);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubResponseDTO resubmitClub(Long clubId, Long actingPlayerId, ClubResubmitRequestDTO dto) {
+    public ClubResponseDTO resubmitClub(Long clubId, ClubResubmitRequestDTO dto) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClubById(clubId);
         validateClubAdmin(club, actingPlayerId);
         validateClubStatus(club, ClubStatus.REJECTED, "Solo un club rechazado puede reenviarse a revisión");
@@ -142,10 +143,10 @@ public class ClubServiceImpl implements ClubService {
         return sendToReview(club, dto.getAffiliationDocumentUrl());
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubResponseDTO replaceAffiliationDocument(Long clubId, Long actingPlayerId, ClubAffiliationDocumentRequestDTO dto) {
+    public ClubResponseDTO replaceAffiliationDocument(Long clubId, ClubAffiliationDocumentRequestDTO dto) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClubById(clubId);
         validateClubAdmin(club, actingPlayerId);
 
@@ -156,10 +157,10 @@ public class ClubServiceImpl implements ClubService {
         return sendToReview(club, dto.getAffiliationDocumentUrl());
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubResponseDTO transferAdministration(Long clubId, Long actingPlayerId, ClubAdminTransferRequestDTO dto) {
+    public ClubResponseDTO transferAdministration(Long clubId, ClubAdminTransferRequestDTO dto) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClubById(clubId);
         validateClubAdmin(club, actingPlayerId);
         validateClubStatus(club, ClubStatus.APPROVED, "Solo un club aprobado puede transferir su administración");
@@ -179,10 +180,9 @@ public class ClubServiceImpl implements ClubService {
         return modelMapper.map(updatedClub, ClubResponseDTO.class);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
-    public PageResponseDTO<ClubReviewResponseDTO> getPendingClubs(Long actingPlayerId, int page, int size) {
-        findSystemAdmin(actingPlayerId);
+    public PageResponseDTO<ClubReviewResponseDTO> getPendingClubs(int page, int size) {
+        findSystemAdmin(SecurityUtils.getRequiredCurrentUserId());
 
         // Oldest requests first, so they are reviewed in arrival order
         return PageResponseDTO.from(
@@ -190,11 +190,10 @@ public class ClubServiceImpl implements ClubService {
                 club -> modelMapper.map(club, ClubReviewResponseDTO.class));
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubReviewResponseDTO approveClub(Long clubId, Long actingPlayerId) {
-        Player reviewer = findSystemAdmin(actingPlayerId);
+    public ClubReviewResponseDTO approveClub(Long clubId) {
+        Player reviewer = findSystemAdmin(SecurityUtils.getRequiredCurrentUserId());
         Club club = findClubById(clubId);
         validateClubStatus(club, ClubStatus.PENDING, "El club ya fue revisado o no está en estado PENDING");
         validateCanAdministerClub(club.getAdmin().getId(), clubId);
@@ -209,11 +208,10 @@ public class ClubServiceImpl implements ClubService {
         return modelMapper.map(approvedClub, ClubReviewResponseDTO.class);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubReviewResponseDTO rejectClub(Long clubId, Long actingPlayerId, ClubRejectRequestDTO dto) {
-        Player reviewer = findSystemAdmin(actingPlayerId);
+    public ClubReviewResponseDTO rejectClub(Long clubId, ClubRejectRequestDTO dto) {
+        Player reviewer = findSystemAdmin(SecurityUtils.getRequiredCurrentUserId());
         Club club = findClubById(clubId);
         validateClubStatus(club, ClubStatus.PENDING, "El club ya fue revisado o no está en estado PENDING");
 
@@ -227,10 +225,9 @@ public class ClubServiceImpl implements ClubService {
         return modelMapper.map(rejectedClub, ClubReviewResponseDTO.class);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
-    public PageResponseDTO<ClubReviewHistoryDTO> getReviewHistory(Long clubId, Long actingPlayerId, int page, int size) {
-        findSystemAdmin(actingPlayerId);
+    public PageResponseDTO<ClubReviewHistoryDTO> getReviewHistory(Long clubId, int page, int size) {
+        findSystemAdmin(SecurityUtils.getRequiredCurrentUserId());
         findClubById(clubId);
 
         return PageResponseDTO.from(
@@ -311,7 +308,6 @@ public class ClubServiceImpl implements ClubService {
         return player.getRole() == Role.ROLE_SYSTEM_ADMIN;
     }
 
-    // NOTE: Reads Player.role but cannot be trusted until actingPlayerId comes from the JWT
     private Player findSystemAdmin(Long actingPlayerId) {
         Player actingPlayer = findPlayerById(actingPlayerId);
 

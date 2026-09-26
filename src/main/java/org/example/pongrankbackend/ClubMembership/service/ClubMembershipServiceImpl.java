@@ -16,6 +16,7 @@ import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -43,10 +44,10 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         this.modelMapper = modelMapper;
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubMembershipResponseDTO requestMembership(Long actingPlayerId, ClubMembershipRequestDTO dto) {
+    public ClubMembershipResponseDTO requestMembership(ClubMembershipRequestDTO dto) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Player player = playerRepository.findById(actingPlayerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + actingPlayerId));
         Club club = findClubById(dto.getClubId());
@@ -71,22 +72,20 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         return toResponse(savedMembership);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
-    public PageResponseDTO<ClubMembershipResponseDTO> getPendingRequests(Long clubId, Long actingPlayerId, int page, int size) {
+    public PageResponseDTO<ClubMembershipResponseDTO> getPendingRequests(Long clubId, int page, int size) {
         Club club = findClubById(clubId);
-        validateClubAdmin(club, actingPlayerId);
+        validateClubAdmin(club, SecurityUtils.getRequiredCurrentUserId());
 
         return PageResponseDTO.from(clubMembershipRepository.findByClubIdAndStatus(
                 clubId, ClubMembershipStatus.PENDING, PageRequestFactory.of(page, size, Sort.by("createdAt").ascending())),
                 this::toResponse);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubMembershipResponseDTO approveRequest(Long membershipId, Long actingPlayerId) {
-        ClubMembership membership = findPendingMembershipManagedBy(membershipId, actingPlayerId);
+    public ClubMembershipResponseDTO approveRequest(Long membershipId) {
+        ClubMembership membership = findPendingMembershipManagedBy(membershipId, SecurityUtils.getRequiredCurrentUserId());
         validateClubIsApproved(membership.getClub());
 
         Long playerId = membership.getPlayer().getId();
@@ -101,20 +100,19 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         return toResponse(clubMembershipRepository.saveAndFlush(membership));
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubMembershipResponseDTO rejectRequest(Long membershipId, Long actingPlayerId) {
-        ClubMembership membership = findPendingMembershipManagedBy(membershipId, actingPlayerId);
+    public ClubMembershipResponseDTO rejectRequest(Long membershipId) {
+        ClubMembership membership = findPendingMembershipManagedBy(membershipId, SecurityUtils.getRequiredCurrentUserId());
         membership.setStatus(ClubMembershipStatus.REJECTED);
 
         return toResponse(clubMembershipRepository.saveAndFlush(membership));
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubMembershipResponseDTO cancelRequest(Long membershipId, Long actingPlayerId) {
+    public ClubMembershipResponseDTO cancelRequest(Long membershipId) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         ClubMembership membership = findMembershipById(membershipId);
         validateMembershipOwner(membership, actingPlayerId);
         validateMembershipStatus(membership, ClubMembershipStatus.PENDING);
@@ -124,10 +122,10 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         return toResponse(clubMembershipRepository.saveAndFlush(membership));
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public ClubMembershipResponseDTO leaveClub(Long membershipId, Long actingPlayerId) {
+    public ClubMembershipResponseDTO leaveClub(Long membershipId) {
+        Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         ClubMembership membership = findMembershipById(membershipId);
         validateMembershipOwner(membership, actingPlayerId);
         validateMembershipStatus(membership, ClubMembershipStatus.APPROVED);

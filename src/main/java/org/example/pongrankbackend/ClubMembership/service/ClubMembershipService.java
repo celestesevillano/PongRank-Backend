@@ -7,19 +7,21 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 
 
+// El jugador que actúa se lee del SecurityContext (SecurityUtils), no se recibe como parámetro,
+// salvo en las operaciones internas usadas por ClubService donde el playerId es un tercero (ej. el nuevo admin).
 public interface ClubMembershipService {
 
-    ClubMembershipResponseDTO requestMembership(Long actingPlayerId, ClubMembershipRequestDTO dto);
+    ClubMembershipResponseDTO requestMembership(ClubMembershipRequestDTO dto);
 
-    PageResponseDTO<ClubMembershipResponseDTO> getPendingRequests(Long clubId, Long actingPlayerId, int page, int size);
+    PageResponseDTO<ClubMembershipResponseDTO> getPendingRequests(Long clubId, int page, int size);
 
-    ClubMembershipResponseDTO approveRequest(Long membershipId, Long actingPlayerId);
+    ClubMembershipResponseDTO approveRequest(Long membershipId);
 
-    ClubMembershipResponseDTO rejectRequest(Long membershipId, Long actingPlayerId);
+    ClubMembershipResponseDTO rejectRequest(Long membershipId);
 
-    ClubMembershipResponseDTO cancelRequest(Long membershipId, Long actingPlayerId);
+    ClubMembershipResponseDTO cancelRequest(Long membershipId);
 
-    ClubMembershipResponseDTO leaveClub(Long membershipId, Long actingPlayerId);
+    ClubMembershipResponseDTO leaveClub(Long membershipId);
 
     PageResponseDTO<ClubMembershipResponseDTO> getActiveMembers(Long clubId, int page, int size);
 
