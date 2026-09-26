@@ -154,7 +154,7 @@ flowchart LR
     CO -.error.-> G[GlobalExceptionHandler]
 ```
 
-Requiere Java 21, Maven 3.9+ y PostgreSQL 14+ (o Docker Compose). Copiar `.env.example` a `.env`. **Obligatorias**: `JWT_SECRET` (base64, 256 bits), `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_PUBLIC_KEY`. **Opcionales**: `SPRING_DATASOURCE_*`, `JWT_EXPIRATION`, `JWT_REFRESH_EXPIRATION` y `CORS_ALLOWED_ORIGINS`.
+Requiere Java 21, Maven 3.9+ y PostgreSQL 14+ (o Docker Compose). Copiar `.env.example` a `.env`. **Obligatorias**: `JWT_SECRET` (base64, 256 bits), `MERCADOPAGO_ACCESS_TOKEN` y `MERCADOPAGO_PUBLIC_KEY`. **En producción también setear** `APP_BACKEND_URL` con la URL pública del deploy (si no, el logo de los correos no carga porque los clientes de correo no pueden llegar a `localhost`) y `MERCADOPAGO_WEBHOOK_SECRET` (firma del webhook). **Opcionales**: `SPRING_DATASOURCE_*`, `JWT_EXPIRATION`, `JWT_REFRESH_EXPIRATION` y `CORS_ALLOWED_ORIGINS`.
 
 ```bash
 git clone https://github.com/celestesevillano/PongRank-Backend.git
