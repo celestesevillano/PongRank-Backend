@@ -98,6 +98,7 @@ public class SecurityConfig {
                     "/api/v1/auth/reset-password",
                     "/api/v1/players/register",
                     "/api/v1/payments/webhook",
+                    "/images/**",
                     "/ws/**",
                     "/v3/api-docs/**",
                     "/swagger-ui/**",
