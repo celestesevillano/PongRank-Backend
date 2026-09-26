@@ -15,6 +15,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/matches")
 public class MatchController {
@@ -32,6 +35,29 @@ public class MatchController {
             @Valid @RequestBody MatchCreateRequestDTO dto) {
         MatchResponseDTO response = matchService.createMatch(currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    /**
+     * Partidos libres (LOCATION) abiertos, cercanos y de nivel similar al del jugador que busca.
+     */
+    @GetMapping("/open")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<MatchResponseDTO>> getOpenLocationMatchesNearby(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam BigDecimal latitude,
+            @RequestParam BigDecimal longitude) {
+        List<MatchResponseDTO> response = matchService.getOpenLocationMatchesNearby(currentUser.getId(), latitude, longitude);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{matchId}/join")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<MatchResponseDTO> joinOpenMatch(
+            @PathVariable Long matchId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @Valid @RequestBody MatchJoinRequestDTO dto) {
+        MatchResponseDTO response = matchService.joinOpenMatch(currentUser.getId(), matchId, dto);
+        return ResponseEntity.ok(response);
     }
 
     /**

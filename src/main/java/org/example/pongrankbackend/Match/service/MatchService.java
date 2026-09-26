@@ -9,11 +9,17 @@ import org.example.pongrankbackend.Tournament.Tournament;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 public interface MatchService {
 
     MatchResponseDTO createMatch(Long creatorPlayerId, MatchCreateRequestDTO dto);
+
+    // Partidos LOCATION abiertos (sin oponente) cercanos y de nivel similar al del jugador que busca
+    List<MatchResponseDTO> getOpenLocationMatchesNearby(Long requesterId, BigDecimal latitude, BigDecimal longitude);
+
+    MatchResponseDTO joinOpenMatch(Long joinerId, Long matchId, MatchJoinRequestDTO dto);
 
     Match createTournamentMatch(Player player1, Player player2, Tournament tournament, MatchFormat format);
 

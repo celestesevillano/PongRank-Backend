@@ -38,6 +38,19 @@ public class MatchWebSocketNotifier {
         }
     }
 
+    public void notifyMatchJoined(Long recipientPlayerId, MatchResponseDTO dto) {
+        try {
+            String destination = "/queue/matches/" + recipientPlayerId + "/joined";
+            messagingTemplate.convertAndSend(destination, (Object) Map.of(
+                    "type", "MATCH_JOINED",
+                    "match", dto
+            ));
+            log.info("Notificación WebSocket de partido libre unido enviada a: {}", destination);
+        } catch (Exception e) {
+            log.warn("No se pudo emitir notificación WebSocket de partido unido: {}", e.getMessage());
+        }
+    }
+
     public void notifyScoreSubmitted(Long matchId, Long recipientPlayerId, MatchResponseDTO dto) {
         try {
             String destination = "/queue/matches/" + recipientPlayerId + "/score-proposed";
