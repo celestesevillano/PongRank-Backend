@@ -10,5 +10,9 @@ public interface PaymentService {
 
     void processWebhookNotification(String paymentId);
 
+    // Valida la firma HMAC que MercadoPago manda en el header x-signature, para que nadie
+    // pueda simular un webhook y forzar el procesamiento de un pago ajeno
+    boolean isValidWebhookSignature(String xSignature, String xRequestId, String dataId);
+
     PaymentStatusResponseDTO getPaymentStatus(Long transactionId, Long requestingPlayerId, boolean isSystemAdmin);
 }

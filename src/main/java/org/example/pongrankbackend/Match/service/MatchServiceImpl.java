@@ -28,6 +28,7 @@ import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,37 +77,18 @@ public class MatchServiceImpl implements MatchService {
     public MatchResponseDTO createMatch(Long creatorPlayerId, MatchCreateRequestDTO dto) {
         Player creator = playerRepository.findById(creatorPlayerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador creador no encontrado con ID: " + creatorPlayerId));
-
-        Player opponent = null;
-        if (dto.getOpponentId() != null) {
-            opponent = playerRepository.findById(dto.getOpponentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Jugador oponente no encontrado con ID: " + dto.getOpponentId()));
-        }
+        Player opponent = findOpponentIfPresent(dto.getOpponentId());
 
         // Obtener relación de amistad si existe para validar la modalidad FRIEND
-        Optional<Friendship> friendshipOpt = Optional.empty();
-        if (opponent != null) {
-            friendshipOpt = friendshipRepository.findFriendshipBetween(creator.getId(), opponent.getId());
-        }
+        Optional<Friendship> friendshipOpt = opponent == null
+                ? Optional.empty()
+                : friendshipRepository.findFriendshipBetween(creator.getId(), opponent.getId());
 
         // Validación estricta de las 3 opciones (FRIEND, COMMUNITY, LOCATION)
         matchRuleValidator.validateMatchCreation(creator, opponent, dto, friendshipOpt);
 
-        Community community = null;
-        if (dto.getCommunityId() != null) {
-            community = entityManager.find(Community.class, dto.getCommunityId());
-            if (community == null) {
-                throw new ResourceNotFoundException("Comunidad no encontrada con ID: " + dto.getCommunityId());
-            }
-        }
-
-        Tournament tournament = null;
-        if (dto.getTournamentId() != null) {
-            tournament = entityManager.find(Tournament.class, dto.getTournamentId());
-            if (tournament == null) {
-                throw new ResourceNotFoundException("Torneo no encontrado con ID: " + dto.getTournamentId());
-            }
-        }
+        Community community = findCommunityIfPresent(dto.getCommunityId());
+        Tournament tournament = findTournamentIfPresent(dto.getTournamentId());
 
         Match match = Match.builder()
                 .player1(creator)
@@ -127,6 +109,36 @@ public class MatchServiceImpl implements MatchService {
         webSocketNotifier.notifyMatchCreated(savedMatch, responseDTO);
 
         return responseDTO;
+    }
+
+    private Player findOpponentIfPresent(Long opponentId) {
+        if (opponentId == null) {
+            return null;
+        }
+        return playerRepository.findById(opponentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador oponente no encontrado con ID: " + opponentId));
+    }
+
+    private Community findCommunityIfPresent(Long communityId) {
+        if (communityId == null) {
+            return null;
+        }
+        Community community = entityManager.find(Community.class, communityId);
+        if (community == null) {
+            throw new ResourceNotFoundException("Comunidad no encontrada con ID: " + communityId);
+        }
+        return community;
+    }
+
+    private Tournament findTournamentIfPresent(Long tournamentId) {
+        if (tournamentId == null) {
+            return null;
+        }
+        Tournament tournament = entityManager.find(Tournament.class, tournamentId);
+        if (tournament == null) {
+            throw new ResourceNotFoundException("Torneo no encontrado con ID: " + tournamentId);
+        }
+        return tournament;
     }
 
     @Override
@@ -172,7 +184,12 @@ public class MatchServiceImpl implements MatchService {
         }
 
         match.setPlayer2(joiner);
-        Match savedMatch = matchRepository.save(match);
+        Match savedMatch;
+        try {
+            savedMatch = matchRepository.saveAndFlush(match);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ConflictException("Este partido libre ya fue tomado por otro jugador, intenta con otro");
+        }
         MatchResponseDTO responseDTO = toResponseDTO(savedMatch);
 
         webSocketNotifier.notifyMatchJoined(match.getPlayer1().getId(), responseDTO);
@@ -291,50 +308,21 @@ public class MatchServiceImpl implements MatchService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
 
-        // Anti-trampa 1: El usuario que reporta debe ser participante del partido
-        boolean isP1 = match.getPlayer1().getId().equals(submittingPlayerId);
-        boolean isP2 = match.getPlayer2() != null && match.getPlayer2().getId().equals(submittingPlayerId);
+        boolean isP1 = validateSubmittingParticipant(match, submittingPlayerId);
+        validateSubmittableState(match);
 
-        if (!isP1 && !isP2) {
-            throw new UnauthorizedActionException("Solo un jugador participante en el partido puede reportar el marcador");
-        }
+        // Reglas de juego ITTF (sets a 11, ventaja de 2, deuce, formato BO3/BO5/BO7 y corte inmediato)
+        matchRuleValidator.validateSetScoresAndDetermineWinner(match.getFormat(), dto.getSets());
+        replaceMatchSets(match, dto.getSets());
 
-        // Anti-trampa 2: Validación de estado del partido
-        if (match.getStatus() == MatchStatus.CONFIRMED) {
-            throw new InvalidMatchStateException("El partido ya fue confirmado y cerrado. No se puede modificar el marcador.");
-        }
-        if (match.getStatus() == MatchStatus.CANCELLED) {
-            throw new InvalidMatchStateException("El partido está cancelado. No se puede reportar marcador.");
-        }
-        if (match.getStatus() == MatchStatus.WALKOVER) {
-            throw new InvalidMatchStateException("El partido fue cerrado por incomparecencia (W.O.). No se puede reportar marcador.");
-        }
-
-        // Anti-trampa 3: Reglas de juego ITTF (sets a 11, ventaja de 2, deuce, formato BO3/BO5/BO7 y corte inmediato)
-        MatchRuleValidator.MatchValidationResult validationResult =
-                matchRuleValidator.validateSetScoresAndDetermineWinner(match.getFormat(), dto.getSets());
-
-        // Limpiar sets previos si existían y persistir los nuevos sets validados sobre la colección existente
-        if (match.getSets() == null) {
-            match.setSets(new ArrayList<>());
-        } else {
-            match.getSets().clear();
-        }
-
-        for (MatchSetRequestDTO setDto : dto.getSets()) {
-            MatchSet matchSet = MatchSet.builder()
-                    .match(match)
-                    .setNumber(setDto.getSetNumber())
-                    .scorePlayer1(setDto.getScorePlayer1())
-                    .scorePlayer2(setDto.getScorePlayer2())
-                    .build();
-            match.getSets().add(matchSet);
-        }
-
-        // Actualizar estado según quién propuso el marcador
         MatchStatus proposedStatus = isP1 ? MatchStatus.PROPOSED_P1 : MatchStatus.PROPOSED_P2;
         match.setStatus(proposedStatus);
-        Match updatedMatch = matchRepository.save(match);
+        Match updatedMatch;
+        try {
+            updatedMatch = matchRepository.saveAndFlush(match);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw new ConflictException("El partido cambió mientras enviabas el marcador; actualízalo y vuelve a intentar");
+        }
 
         MatchDetailResponseDTO detailDTO = toDetailResponseDTO(updatedMatch);
 
@@ -345,51 +333,59 @@ public class MatchServiceImpl implements MatchService {
         return detailDTO;
     }
 
+    // Anti-trampa 1: el usuario que reporta debe ser participante del partido. Devuelve true si es player1.
+    private boolean validateSubmittingParticipant(Match match, Long submittingPlayerId) {
+        boolean isP1 = match.getPlayer1().getId().equals(submittingPlayerId);
+        boolean isP2 = match.getPlayer2() != null && match.getPlayer2().getId().equals(submittingPlayerId);
+
+        if (!isP1 && !isP2) {
+            throw new UnauthorizedActionException("Solo un jugador participante en el partido puede reportar el marcador");
+        }
+        return isP1;
+    }
+
+    // Anti-trampa 2: validación de estado del partido
+    private void validateSubmittableState(Match match) {
+        if (match.getStatus() == MatchStatus.CONFIRMED) {
+            throw new InvalidMatchStateException("El partido ya fue confirmado y cerrado. No se puede modificar el marcador.");
+        }
+        if (match.getStatus() == MatchStatus.CANCELLED) {
+            throw new InvalidMatchStateException("El partido está cancelado. No se puede reportar marcador.");
+        }
+        if (match.getStatus() == MatchStatus.WALKOVER) {
+            throw new InvalidMatchStateException("El partido fue cerrado por incomparecencia (W.O.). No se puede reportar marcador.");
+        }
+    }
+
+    // Limpia los sets previos si existían y persiste los nuevos sets validados sobre la colección existente
+    private void replaceMatchSets(Match match, List<MatchSetRequestDTO> setDtos) {
+        if (match.getSets() == null) {
+            match.setSets(new ArrayList<>());
+        } else {
+            match.getSets().clear();
+        }
+
+        for (MatchSetRequestDTO setDto : setDtos) {
+            MatchSet matchSet = MatchSet.builder()
+                    .match(match)
+                    .setNumber(setDto.getSetNumber())
+                    .scorePlayer1(setDto.getScorePlayer1())
+                    .scorePlayer2(setDto.getScorePlayer2())
+                    .build();
+            match.getSets().add(matchSet);
+        }
+    }
+
     @Override
     @Transactional
     public MatchDetailResponseDTO confirmMatch(Long matchId, Long actingPlayerId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
 
-        // Mecanismo Anti-Trampa: Doble confirmación estricta
-        if (match.getStatus() == MatchStatus.CREATED) {
-            throw new InvalidMatchStateException("No se puede confirmar un partido que aún no tiene marcador reportado");
-        }
-        if (match.getStatus() == MatchStatus.CONFIRMED) {
-            throw new InvalidMatchStateException("El partido ya fue confirmado y cerrado previamente");
-        }
-        if (match.getStatus() == MatchStatus.CANCELLED) {
-            throw new InvalidMatchStateException("El partido se encuentra cancelado");
-        }
-        if (match.getStatus() == MatchStatus.WALKOVER) {
-            throw new InvalidMatchStateException("El partido fue cerrado por incomparecencia (W.O.)");
-        }
+        validateConfirmableState(match);
+        validateNotSelfConfirming(match, actingPlayerId);
 
-        // Anti-auto-aprobación: El proponente NO puede auto-confirmarse su marcador
-        if (match.getStatus() == MatchStatus.PROPOSED_P1) {
-            if (actingPlayerId.equals(match.getPlayer1().getId())) {
-                throw new UnauthorizedActionException("Mecanismo anti-trampa: El jugador proponente no puede confirmar su propio resultado. Debe confirmarlo el contrincante.");
-            }
-            if (!actingPlayerId.equals(match.getPlayer2().getId())) {
-                throw new UnauthorizedActionException("Solo el jugador contrincante puede confirmar el resultado propuesto");
-            }
-        } else if (match.getStatus() == MatchStatus.PROPOSED_P2) {
-            if (actingPlayerId.equals(match.getPlayer2().getId())) {
-                throw new UnauthorizedActionException("Mecanismo anti-trampa: El jugador proponente no puede confirmar su propio resultado. Debe confirmarlo el contrincante.");
-            }
-            if (!actingPlayerId.equals(match.getPlayer1().getId())) {
-                throw new UnauthorizedActionException("Solo el jugador contrincante puede confirmar el resultado propuesto");
-            }
-        }
-
-        // Determinar ganador para el cálculo Glicko-2
-        long setsWonP1 = match.getSets().stream()
-                .filter(s -> s.getScorePlayer1() > s.getScorePlayer2())
-                .count();
-        long setsWonP2 = match.getSets().stream()
-                .filter(s -> s.getScorePlayer2() > s.getScorePlayer1())
-                .count();
-        boolean p1Won = setsWonP1 > setsWonP2;
+        boolean p1Won = didPlayer1WinBySets(match);
 
         // Sellar partido como CONFIRMED
         match.setStatus(MatchStatus.CONFIRMED);
@@ -406,6 +402,51 @@ public class MatchServiceImpl implements MatchService {
         webSocketNotifier.notifyMatchConfirmed(savedMatch.getId(), toResponseDTO(savedMatch));
 
         return detailDTO;
+    }
+
+    // Mecanismo anti-trampa: doble confirmación estricta
+    private void validateConfirmableState(Match match) {
+        if (match.getStatus() == MatchStatus.CREATED) {
+            throw new InvalidMatchStateException("No se puede confirmar un partido que aún no tiene marcador reportado");
+        }
+        if (match.getStatus() == MatchStatus.CONFIRMED) {
+            throw new InvalidMatchStateException("El partido ya fue confirmado y cerrado previamente");
+        }
+        if (match.getStatus() == MatchStatus.CANCELLED) {
+            throw new InvalidMatchStateException("El partido se encuentra cancelado");
+        }
+        if (match.getStatus() == MatchStatus.WALKOVER) {
+            throw new InvalidMatchStateException("El partido fue cerrado por incomparecencia (W.O.)");
+        }
+    }
+
+    // Anti-auto-aprobación: el proponente NO puede auto-confirmarse su marcador
+    private void validateNotSelfConfirming(Match match, Long actingPlayerId) {
+        if (match.getStatus() == MatchStatus.PROPOSED_P1) {
+            if (actingPlayerId.equals(match.getPlayer1().getId())) {
+                throw new UnauthorizedActionException("Mecanismo anti-trampa: El jugador proponente no puede confirmar su propio resultado. Debe confirmarlo el contrincante.");
+            }
+            if (!actingPlayerId.equals(match.getPlayer2().getId())) {
+                throw new UnauthorizedActionException("Solo el jugador contrincante puede confirmar el resultado propuesto");
+            }
+        } else if (match.getStatus() == MatchStatus.PROPOSED_P2) {
+            if (actingPlayerId.equals(match.getPlayer2().getId())) {
+                throw new UnauthorizedActionException("Mecanismo anti-trampa: El jugador proponente no puede confirmar su propio resultado. Debe confirmarlo el contrincante.");
+            }
+            if (!actingPlayerId.equals(match.getPlayer1().getId())) {
+                throw new UnauthorizedActionException("Solo el jugador contrincante puede confirmar el resultado propuesto");
+            }
+        }
+    }
+
+    private boolean didPlayer1WinBySets(Match match) {
+        long setsWonP1 = match.getSets().stream()
+                .filter(s -> s.getScorePlayer1() > s.getScorePlayer2())
+                .count();
+        long setsWonP2 = match.getSets().stream()
+                .filter(s -> s.getScorePlayer2() > s.getScorePlayer1())
+                .count();
+        return setsWonP1 > setsWonP2;
     }
 
     @Override
@@ -434,6 +475,43 @@ public class MatchServiceImpl implements MatchService {
 
         // Notificar en tiempo real la disputa
         webSocketNotifier.notifyMatchDisputed(savedMatch.getId(), dto.getReason(), toResponseDTO(savedMatch));
+
+        return detailDTO;
+    }
+
+    @Override
+    @Transactional
+    public MatchDetailResponseDTO resolveDispute(Long matchId, MatchDisputeResolutionDTO dto) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
+
+        if (match.getStatus() != MatchStatus.DISPUTED) {
+            throw new InvalidMatchStateException("Solo se puede resolver un partido que está en disputa");
+        }
+
+        match.setDisputeReason(match.getDisputeReason() + " | Resolución del administrador: " + dto.getResolutionNote());
+
+        if (dto.getWinnerId() == null) {
+            match.setStatus(MatchStatus.CANCELLED);
+            Match savedMatch = matchRepository.save(match);
+            return toDetailResponseDTO(savedMatch);
+        }
+
+        boolean isP1 = match.getPlayer1().getId().equals(dto.getWinnerId());
+        boolean isP2 = match.getPlayer2() != null && match.getPlayer2().getId().equals(dto.getWinnerId());
+        if (!isP1 && !isP2) {
+            throw new InvalidMatchStateException("El jugador ganador indicado no participa en este partido");
+        }
+
+        match.setStatus(MatchStatus.CONFIRMED);
+        match.setWinner(isP1 ? match.getPlayer1() : match.getPlayer2());
+        match.setConfirmedAt(LocalDateTime.now());
+        Match savedMatch = matchRepository.save(match);
+
+        eventPublisher.publishEvent(new MatchConfirmedEvent(this, savedMatch.getId(), isP1));
+
+        MatchDetailResponseDTO detailDTO = toDetailResponseDTO(savedMatch);
+        webSocketNotifier.notifyMatchConfirmed(savedMatch.getId(), toResponseDTO(savedMatch));
 
         return detailDTO;
     }

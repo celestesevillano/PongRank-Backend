@@ -48,8 +48,20 @@ public class FriendshipServiceImpl implements FriendshipService {
         Player receiver = playerRepository.findById(receiverId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador receptor no encontrado con ID: " + receiverId));
 
-        if (friendshipRepository.existsFriendshipBetween(senderId, receiverId)) {
-            throw new ConflictException("Ya existe una relación de amistad o solicitud pendiente entre ambos jugadores");
+        var existing = friendshipRepository.findFriendshipBetween(senderId, receiverId);
+        if (existing.isPresent()) {
+            Friendship friendship = existing.get();
+
+            // Un rechazo anterior no bloquea para siempre: se puede volver a intentar
+            if (friendship.getStatus() != FriendshipStatus.REJECTED) {
+                throw new ConflictException("Ya existe una relación de amistad o solicitud pendiente entre ambos jugadores");
+            }
+
+            friendship.setPlayerA(sender);
+            friendship.setPlayerB(receiver);
+            friendship.setStatus(FriendshipStatus.PENDING);
+            Friendship updatedFriendship = friendshipRepository.save(friendship);
+            return modelMapper.map(updatedFriendship, FriendshipResponseDTO.class);
         }
 
         Friendship friendship = Friendship.builder()
@@ -60,6 +72,42 @@ public class FriendshipServiceImpl implements FriendshipService {
 
         Friendship savedFriendship = friendshipRepository.save(friendship);
         return modelMapper.map(savedFriendship, FriendshipResponseDTO.class);
+    }
+
+    @Override
+    @Transactional
+    public void cancelFriendRequest(Long friendshipId, Long actingPlayerId) {
+        Friendship friendship = friendshipRepository.findById(friendshipId)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitud de amistad no encontrada con ID: " + friendshipId));
+
+        if (!friendship.getPlayerA().getId().equals(actingPlayerId)) {
+            throw new UnauthorizedActionException("Solo quien envió la solicitud puede cancelarla");
+        }
+
+        if (friendship.getStatus() != FriendshipStatus.PENDING) {
+            throw new ConflictException("La solicitud de amistad ya fue procesada o no está en estado PENDING");
+        }
+
+        friendshipRepository.delete(friendship);
+    }
+
+    @Override
+    @Transactional
+    public void unfriend(Long friendshipId, Long actingPlayerId) {
+        Friendship friendship = friendshipRepository.findById(friendshipId)
+                .orElseThrow(() -> new ResourceNotFoundException("Solicitud de amistad no encontrada con ID: " + friendshipId));
+
+        boolean isParticipant = friendship.getPlayerA().getId().equals(actingPlayerId)
+                || friendship.getPlayerB().getId().equals(actingPlayerId);
+        if (!isParticipant) {
+            throw new UnauthorizedActionException("Solo los jugadores de la amistad pueden terminarla");
+        }
+
+        if (friendship.getStatus() != FriendshipStatus.ACCEPTED) {
+            throw new ConflictException("Solo se puede terminar una amistad ya aceptada");
+        }
+
+        friendshipRepository.delete(friendship);
     }
 
     @Override

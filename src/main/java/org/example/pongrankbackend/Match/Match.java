@@ -47,6 +47,11 @@ public class Match {
     @JoinColumn(name = "winner_id")
     private Player winner;
 
+    // Optimistic locking: evita que dos jugadores "ganen" el mismo cupo libre o que un
+    // envío de marcador pise al otro sin avisar cuando ambos actúan casi al mismo tiempo.
+    @Version
+    private Long version;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

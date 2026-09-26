@@ -21,12 +21,13 @@ import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.service.AuthService;
+import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
-import org.example.pongrankbackend.email.service.EmailService;
 import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,7 +45,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final CommunityMembershipRepository communityMembershipRepository;
     private final MembershipService membershipService;
     private final PasswordEncoder passwordEncoder;
-    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
     private final ModelMapper modelMapper;
     private final AuthService authService;
 
@@ -54,7 +55,7 @@ public class PlayerServiceImpl implements PlayerService {
                              CommunityMembershipRepository communityMembershipRepository,
                              MembershipService membershipService,
                              PasswordEncoder passwordEncoder,
-                             EmailService emailService,
+                             ApplicationEventPublisher eventPublisher,
                              ModelMapper modelMapper,
                              AuthService authService) {
         this.playerRepository = playerRepository;
@@ -63,7 +64,7 @@ public class PlayerServiceImpl implements PlayerService {
         this.communityMembershipRepository = communityMembershipRepository;
         this.membershipService = membershipService;
         this.passwordEncoder = passwordEncoder;
-        this.emailService = emailService;
+        this.eventPublisher = eventPublisher;
         this.modelMapper = modelMapper;
         this.authService = authService;
     }
@@ -144,7 +145,7 @@ public class PlayerServiceImpl implements PlayerService {
         }
 
         MembershipPlan activePlan = membershipService.getActivePlan(playerId);
-        emailService.sendAccountDeletedEmail(player, activePlan);
+        eventPublisher.publishEvent(new AccountDeletedEvent(this, player.getName(), player.getEmail(), activePlan));
 
         LocalDateTime now = LocalDateTime.now();
 

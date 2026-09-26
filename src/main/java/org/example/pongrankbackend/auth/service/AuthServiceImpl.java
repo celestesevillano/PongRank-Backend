@@ -12,17 +12,19 @@ import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.dto.ForgotPasswordRequestDTO;
 import org.example.pongrankbackend.auth.dto.RefreshTokenRequestDTO;
 import org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO;
+import org.example.pongrankbackend.auth.event.PasswordResetRequestedEvent;
+import org.example.pongrankbackend.auth.event.PlayerRegisteredEvent;
 import org.example.pongrankbackend.auth.repository.PasswordResetTokenRepository;
 import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
-import org.example.pongrankbackend.email.service.EmailService;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.example.pongrankbackend.security.JwtService;
 import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +42,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
     private final ModelMapper modelMapper;
 
     @Value("${app.frontend-url}")
@@ -50,13 +52,13 @@ public class AuthServiceImpl implements AuthService {
                            PasswordResetTokenRepository passwordResetTokenRepository,
                            PasswordEncoder passwordEncoder,
                            JwtService jwtService,
-                           EmailService emailService,
+                           ApplicationEventPublisher eventPublisher,
                            ModelMapper modelMapper) {
         this.playerRepository = playerRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
-        this.emailService = emailService;
+        this.eventPublisher = eventPublisher;
         this.modelMapper = modelMapper;
     }
 
@@ -83,7 +85,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Player savedPlayer = playerRepository.save(player);
-        emailService.sendWelcomeEmail(savedPlayer);
+        eventPublisher.publishEvent(new PlayerRegisteredEvent(this, savedPlayer.getId()));
 
         CustomUserDetails userDetails = new CustomUserDetails(savedPlayer);
 
@@ -189,7 +191,7 @@ public class AuthServiceImpl implements AuthService {
             passwordResetTokenRepository.save(resetToken);
 
             String resetLink = frontendUrl + "/reset-password?token=" + resetToken.getToken();
-            emailService.sendPasswordResetEmail(player, resetLink, RESET_TOKEN_EXPIRATION_MINUTES);
+            eventPublisher.publishEvent(new PasswordResetRequestedEvent(this, player.getId(), resetLink, RESET_TOKEN_EXPIRATION_MINUTES));
         });
 
         // No se informa si el email existe o no, para no filtrar cuentas registradas

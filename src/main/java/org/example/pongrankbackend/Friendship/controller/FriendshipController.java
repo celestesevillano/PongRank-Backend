@@ -57,8 +57,34 @@ public class FriendshipController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/{friendshipId}/cancel")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> cancelFriendRequest(
+            @PathVariable Long friendshipId,
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        friendshipService.cancelFriendRequest(friendshipId, currentUser.getId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/{friendshipId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> unfriend(
+            @PathVariable Long friendshipId,
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        friendshipService.unfriend(friendshipId, currentUser.getId());
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/players/{playerId}")
-    public ResponseEntity<List<FriendshipResponseDTO>> getAcceptedFriends(@PathVariable Long playerId) {
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<FriendshipResponseDTO>> getAcceptedFriends(
+            @PathVariable Long playerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
+        if (!currentUser.getId().equals(playerId) && !isSystemAdmin) {
+            throw new UnauthorizedActionException(
+                    "Solo puedes consultar tu propia lista de amigos");
+        }
         List<FriendshipResponseDTO> response = friendshipService.getAcceptedFriends(playerId);
         return ResponseEntity.ok(response);
     }

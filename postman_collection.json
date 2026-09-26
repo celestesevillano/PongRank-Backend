@@ -178,8 +178,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.accessToken) {",
-                  "    pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('accessToken', res.token);",
                   "    pm.collectionVariables.set('refreshToken', res.refreshToken);",
                   "}",
                   "if (res.player && res.player.id) {",
@@ -551,6 +551,49 @@
               ]
             },
             "description": "Mismas reglas que aceptar, pero deja la relación en estado REJECTED."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar solicitud",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/{{friendshipId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "{{friendshipId}}",
+                "cancel"
+              ]
+            },
+            "description": "El emisor cancela su propia solicitud mientras siga PENDING."
+          },
+          "response": []
+        },
+        {
+          "name": "Deshacer amistad",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/{{friendshipId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "{{friendshipId}}"
+              ]
+            },
+            "description": "Cualquiera de los dos jugadores termina una amistad ya ACCEPTED."
           },
           "response": []
         },
@@ -1137,6 +1180,42 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"reason\": \"El marcador del tercer set no coincide\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Resolver disputa (admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/resolve-dispute",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "resolve-dispute"
+              ]
+            },
+            "description": "Solo ROLE_SYSTEM_ADMIN. Declara un ganador (afecta el rating) o anula el partido si winnerId es null.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"winnerId\": null,\n  \"resolutionNote\": \"Se revisó el video del partido: no hay evidencia suficiente, se anula\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2272,7 +2351,7 @@
             "description": "Genera la preferencia de Checkout Pro y devuelve el link de pago para el plan elegido.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"PREMIUM\"\n}",
+              "raw": "{\n  \"plan\": \"BASIC\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2286,7 +2365,18 @@
           "name": "Webhook de MercadoPago",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "x-signature",
+                "value": "ts=1700000000,v1=<hash calculado con MERCADOPAGO_WEBHOOK_SECRET>",
+                "description": "Opcional en local si no configuraste MERCADOPAGO_WEBHOOK_SECRET; si lo configuraste, el webhook responde 401 sin una firma válida."
+              },
+              {
+                "key": "x-request-id",
+                "value": "req-123456",
+                "description": "Va junto con x-signature en el hash que valida MercadoPago."
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/webhook?type=payment&data.id=123456",
               "host": [
@@ -2299,7 +2389,7 @@
                 "webhook?type=payment&data.id=123456"
               ]
             },
-            "description": "Endpoint público que MercadoPago invoca al confirmarse un pago. Activa la membresía del jugador.",
+            "description": "Endpoint público que MercadoPago invoca al confirmarse un pago. Activa la membresía del jugador. Valida x-signature/x-request-id contra MERCADOPAGO_WEBHOOK_SECRET cuando está configurado.",
             "auth": {
               "type": "noauth"
             }

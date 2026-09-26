@@ -9,18 +9,21 @@ import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.auth.dto.AuthRequestDTO;
 import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.dto.RefreshTokenRequestDTO;
+import org.example.pongrankbackend.auth.event.PasswordResetRequestedEvent;
+import org.example.pongrankbackend.auth.event.PlayerRegisteredEvent;
 import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
-import org.example.pongrankbackend.email.service.EmailService;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.example.pongrankbackend.security.JwtService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
@@ -28,7 +31,6 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -49,7 +51,7 @@ class AuthServiceImplTest {
     private JwtService jwtService;
 
     @Mock
-    private EmailService emailService;
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private ModelMapper modelMapper;
@@ -290,7 +292,10 @@ class AuthServiceImplTest {
                 .email("adriana@utec.edu.pe").build());
 
         verify(passwordResetTokenRepository).save(any(org.example.pongrankbackend.auth.PasswordResetToken.class));
-        verify(emailService).sendPasswordResetEmail(eq(player), anyString(), eq(30));
+        ArgumentCaptor<PasswordResetRequestedEvent> captor = ArgumentCaptor.forClass(PasswordResetRequestedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getPlayerId()).isEqualTo(player.getId());
+        assertThat(captor.getValue().getExpirationMinutes()).isEqualTo(30);
     }
 
     @Test
@@ -302,7 +307,7 @@ class AuthServiceImplTest {
                 .email("no-existe@utec.edu.pe").build());
 
         verify(passwordResetTokenRepository, never()).save(any());
-        verify(emailService, never()).sendPasswordResetEmail(any(), any(), anyInt());
+        verify(eventPublisher, never()).publishEvent(any(PasswordResetRequestedEvent.class));
     }
 
     @Test
