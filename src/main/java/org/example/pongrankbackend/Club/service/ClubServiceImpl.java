@@ -47,6 +47,9 @@ public class ClubServiceImpl implements ClubService {
     @Value("${club.max-administered.enterprise}")
     private int maxAdministeredEnterprise;
 
+    @Value("${club.max-total.enterprise}")
+    private int maxTotalEnterprise;
+
     public ClubServiceImpl(ClubRepository clubRepository,
                            ClubReviewRepository clubReviewRepository,
                            PlayerRepository playerRepository,
@@ -66,11 +69,12 @@ public class ClubServiceImpl implements ClubService {
     public ClubResponseDTO registerClub(ClubRegisterRequestDTO dto) {
         Long requesterId = SecurityUtils.getRequiredCurrentUserId();
         Player requester = findPlayerById(requesterId);
-        validateCanAdministerClub(requesterId, null);
 
         if (!membershipService.canCreateClub(requesterId)) {
             throw new PlanRestrictionException("Solo los jugadores con plan ENTERPRISE pueden crear un club");
         }
+
+        validateCanAdministerClub(requesterId, null);
 
         String normalizedName = dto.getName().trim();
         validateNameIsAvailable(normalizedName);
@@ -267,11 +271,14 @@ public class ClubServiceImpl implements ClubService {
     }
 
     // currentClubId excluye el club que se está reenviando o aprobando; null al registrar un club nuevo.
-    // NOTA: hasActiveMembershipOutsideClub sigue asumiendo un solo club por jugador (como admin o miembro).
-    // Si algún día maxAdministeredEnterprise sube de 1, esa regla también debe rediseñarse.
+    // Solo llega aquí un jugador que ya pasó el gate de canCreateClub (ENTERPRISE).
     private void validateCanAdministerClub(Long playerId, Long currentClubId) {
-        if (clubMembershipService.hasActiveMembershipOutsideClub(playerId, currentClubId)) {
-            throw new ConflictException("El jugador ya pertenece a otro club o tiene una solicitud de ingreso pendiente");
+        long totalClubs = clubMembershipService.countActiveMemberships(playerId);
+        int maxTotal = maxTotalEnterprise;
+
+        if (totalClubs >= maxTotal) {
+            throw new PlanRestrictionException("Alcanzaste el máximo de " + maxTotal
+                    + " club(es) que tu plan permite (crear o unirte)");
         }
 
         long administeredClubs = currentClubId == null

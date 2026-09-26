@@ -9,23 +9,24 @@ import org.example.pongrankbackend.ClubMembership.ClubMembershipStatus;
 import org.example.pongrankbackend.ClubMembership.dto.ClubMembershipRequestDTO;
 import org.example.pongrankbackend.ClubMembership.dto.ClubMembershipResponseDTO;
 import org.example.pongrankbackend.ClubMembership.repository.ClubMembershipRepository;
+import org.example.pongrankbackend.Membership.MembershipPlan;
+import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
-import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Service
 @Transactional(readOnly = true)
@@ -36,6 +37,18 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     private final PlayerRepository playerRepository;
     private final MembershipService membershipService;
     private final ModelMapper modelMapper;
+
+    @Value("${club.max-total.freemium}")
+    private int maxTotalFreemium;
+
+    @Value("${club.max-total.basic}")
+    private int maxTotalBasic;
+
+    @Value("${club.max-total.pro}")
+    private int maxTotalPro;
+
+    @Value("${club.max-total.enterprise}")
+    private int maxTotalEnterprise;
 
     public ClubMembershipServiceImpl(ClubMembershipRepository clubMembershipRepository,
                                      ClubRepository clubRepository,
@@ -58,17 +71,16 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         Club club = findClubById(dto.getClubId());
         validateClubIsApproved(club);
 
-        if (!membershipService.isPaidMember(actingPlayerId)) {
-            throw new PlanRestrictionException("El plan FREEMIUM no puede unirse a un club; actualiza tu plan a BASIC o superior");
-        }
-
-        if (clubMembershipRepository.existsByPlayerIdAndStatusIn(actingPlayerId, ClubMembershipStatus.ACTIVE_STATUSES)) {
-            throw new ConflictException("El jugador ya pertenece a un club o tiene una solicitud pendiente");
+        if (clubMembershipRepository.existsByPlayerIdAndClubIdAndStatusIn(
+                actingPlayerId, club.getId(), ClubMembershipStatus.ACTIVE_STATUSES)) {
+            throw new ConflictException("El jugador ya pertenece a este club o tiene una solicitud pendiente");
         }
 
         if (clubRepository.existsByAdminIdAndStatusIn(actingPlayerId, ClubStatus.ACTIVE_STATUSES)) {
             throw new ConflictException("El jugador administra un club en revisión o aprobado y no puede unirse a otro");
         }
+
+        validateWithinPlanLimit(actingPlayerId);
 
         ClubMembership membership = ClubMembership.builder()
                 .player(player)
@@ -96,12 +108,6 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     public ClubMembershipResponseDTO approveRequest(Long membershipId) {
         ClubMembership membership = findPendingMembershipManagedBy(membershipId, SecurityUtils.getRequiredCurrentUserId());
         validateClubIsApproved(membership.getClub());
-
-        Long playerId = membership.getPlayer().getId();
-        if (clubMembershipRepository.existsByPlayerIdAndStatusInAndClubIdNot(
-                playerId, List.of(ClubMembershipStatus.APPROVED), membership.getClub().getId())) {
-            throw new ConflictException("El jugador ya pertenece a otro club");
-        }
 
         membership.setStatus(ClubMembershipStatus.APPROVED);
         membership.setJoinedAt(LocalDateTime.now());
@@ -168,12 +174,8 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     }
 
     @Override
-    public boolean hasActiveMembershipOutsideClub(Long playerId, Long clubId) {
-        if (clubId == null) {
-            return clubMembershipRepository.existsByPlayerIdAndStatusIn(playerId, ClubMembershipStatus.ACTIVE_STATUSES);
-        }
-        return clubMembershipRepository.existsByPlayerIdAndStatusInAndClubIdNot(
-                playerId, ClubMembershipStatus.ACTIVE_STATUSES, clubId);
+    public long countActiveMemberships(Long playerId) {
+        return clubMembershipRepository.countByPlayerIdAndStatusIn(playerId, ClubMembershipStatus.ACTIVE_STATUSES);
     }
 
     @Override
@@ -196,9 +198,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
             return;
         }
 
-        if (hasActiveMembershipOutsideClub(admin.getId(), club.getId())) {
-            throw new ConflictException("El administrador del club ya pertenece a otro club o tiene una solicitud pendiente");
-        }
+        validateWithinPlanLimit(admin.getId());
 
         ClubMembership adminMembership = ClubMembership.builder()
                 .player(admin)
@@ -267,6 +267,26 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
         if (membership.getStatus() != expectedStatus) {
             throw new ConflictException("La membresía debe estar en estado " + expectedStatus + " para realizar esta acción");
         }
+    }
+
+    private void validateWithinPlanLimit(Long playerId) {
+        MembershipPlan plan = membershipService.getActivePlan(playerId);
+        int limit = maxTotalFor(plan);
+        long activeMemberships = countActiveMemberships(playerId);
+
+        if (activeMemberships >= limit) {
+            throw new PlanRestrictionException(
+                    "Alcanzaste el máximo de " + limit + " club(es) que tu plan permite");
+        }
+    }
+
+    private int maxTotalFor(MembershipPlan plan) {
+        return switch (plan) {
+            case FREEMIUM -> maxTotalFreemium;
+            case BASIC -> maxTotalBasic;
+            case PRO -> maxTotalPro;
+            case ENTERPRISE -> maxTotalEnterprise;
+        };
     }
 
     private void validateClubIsApproved(Club club) {
