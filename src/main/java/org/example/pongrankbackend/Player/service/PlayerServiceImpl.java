@@ -117,18 +117,38 @@ public class PlayerServiceImpl implements PlayerService {
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
 
-        if (!passwordEncoder.matches(dto.getPassword(), player.getPassword())) {
+        validatePassword(dto.getPassword(), player);
+        validateNotAdministeringActiveClub(playerId);
+
+        List<CommunityMembership> activeCommunityMemberships =
+                communityMembershipRepository.findByPlayerIdWithCommunity(playerId, MembershipStatus.ACTIVE);
+        validateNotSoleCommunityAdmin(activeCommunityMemberships);
+
+        MembershipPlan activePlan = membershipService.getActivePlan(playerId);
+        eventPublisher.publishEvent(new AccountDeletedEvent(this, player.getName(), player.getEmail(), activePlan));
+
+        LocalDateTime now = LocalDateTime.now();
+        deactivateCommunityMemberships(activeCommunityMemberships, now);
+        deactivateClubMemberships(playerId, now);
+        anonymizeAndDeactivate(player, playerId, now);
+    }
+
+    private void validatePassword(String password, Player player) {
+        if (!passwordEncoder.matches(password, player.getPassword())) {
             throw new InvalidCredentialsException("La contraseña ingresada no es correcta");
         }
+    }
 
+    private void validateNotAdministeringActiveClub(Long playerId) {
         if (clubRepository.existsByAdminIdAndStatusIn(playerId, ClubStatus.ACTIVE_STATUSES)) {
             throw new ConflictException(
                     "Debes transferir la administración de tu club antes de eliminar tu cuenta");
         }
+    }
 
-        List<CommunityMembership> activeCommunityMemberships =
-                communityMembershipRepository.findByPlayerIdWithCommunity(playerId, MembershipStatus.ACTIVE);
-
+    // Si el jugador es el único admin activo de alguna comunidad, no puede eliminar su cuenta sin
+    // dejarla huérfana de administración
+    private void validateNotSoleCommunityAdmin(List<CommunityMembership> activeCommunityMemberships) {
         for (CommunityMembership membership : activeCommunityMemberships) {
             boolean isAdmin = membership.getRole() == CommunityRole.COMMUNITY_ADMIN;
             if (!isAdmin) {
@@ -143,18 +163,17 @@ public class PlayerServiceImpl implements PlayerService {
                         + membership.getCommunity().getName() + "' antes de eliminar tu cuenta");
             }
         }
+    }
 
-        MembershipPlan activePlan = membershipService.getActivePlan(playerId);
-        eventPublisher.publishEvent(new AccountDeletedEvent(this, player.getName(), player.getEmail(), activePlan));
-
-        LocalDateTime now = LocalDateTime.now();
-
-        for (CommunityMembership membership : activeCommunityMemberships) {
+    private void deactivateCommunityMemberships(List<CommunityMembership> memberships, LocalDateTime now) {
+        for (CommunityMembership membership : memberships) {
             membership.setStatus(MembershipStatus.INACTIVE);
             membership.setLeftAt(now);
         }
-        communityMembershipRepository.saveAll(activeCommunityMemberships);
+        communityMembershipRepository.saveAll(memberships);
+    }
 
+    private void deactivateClubMemberships(Long playerId, LocalDateTime now) {
         List<ClubMembership> activeClubMemberships = clubMembershipRepository
                 .findByPlayerId(playerId, org.springframework.data.domain.Pageable.unpaged())
                 .stream()
@@ -165,7 +184,10 @@ public class PlayerServiceImpl implements PlayerService {
             membership.setLeftAt(now);
         }
         clubMembershipRepository.saveAll(activeClubMemberships);
+    }
 
+    // Muta el email para liberar la restricción de unicidad y permitir un futuro re-registro
+    private void anonymizeAndDeactivate(Player player, Long playerId, LocalDateTime now) {
         player.setEmail(player.getEmail() + ".deleted." + playerId + "." + now.toEpochSecond(java.time.ZoneOffset.UTC));
         player.setPassword(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
         player.setStatus(PlayerStatus.DELETED);
