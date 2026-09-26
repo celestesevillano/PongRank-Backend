@@ -13,9 +13,9 @@ import java.util.Optional;
 @Repository
 public interface ClubMembershipRepository extends JpaRepository<ClubMembership, Long> {
 
-    boolean existsByPlayerIdAndStatusIn(Long playerId, Collection<ClubMembershipStatus> statuses);
+    boolean existsByPlayerIdAndClubIdAndStatusIn(Long playerId, Long clubId, Collection<ClubMembershipStatus> statuses);
 
-    boolean existsByPlayerIdAndStatusInAndClubIdNot(Long playerId, Collection<ClubMembershipStatus> statuses, Long clubId);
+    long countByPlayerIdAndStatusIn(Long playerId, Collection<ClubMembershipStatus> statuses);
 
     Optional<ClubMembership> findByPlayerIdAndClubIdAndStatus(Long playerId, Long clubId, ClubMembershipStatus status);
 

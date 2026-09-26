@@ -29,7 +29,8 @@ public interface ClubMembershipService {
 
     // Internal operations used by ClubService (not exposed through HTTP)
 
-    boolean hasActiveMembershipOutsideClub(Long playerId, Long clubId);
+    // Total de membresías activas (PENDING+APPROVED) del jugador, en cualquier club
+    long countActiveMemberships(Long playerId);
 
     boolean isActiveMember(Long clubId, Long playerId);
 
