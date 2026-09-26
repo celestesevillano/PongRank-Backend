@@ -48,6 +48,7 @@ class EmailServiceImplTest {
         emailService = new EmailServiceImpl(mailSender, templateEngine);
         ReflectionTestUtils.setField(emailService, "fromAddress", "no-reply@pongrank.app");
         ReflectionTestUtils.setField(emailService, "frontendUrl", "http://localhost:5173");
+        ReflectionTestUtils.setField(emailService, "backendUrl", "http://localhost:8080");
     }
 
     private Player player() {

@@ -34,15 +34,26 @@ public class EmailServiceImpl implements EmailService {
     @Value("${app.frontend-url}")
     private String frontendUrl;
 
+    @Value("${app.backend-url}")
+    private String backendUrl;
+
     public EmailServiceImpl(JavaMailSender mailSender, TemplateEngine templateEngine) {
         this.mailSender = mailSender;
         this.templateEngine = templateEngine;
     }
 
+    // Todas las plantillas llevan el logo de PongRank en el header; los clientes de correo no
+    // pueden cargar rutas relativas ni archivos locales, así que necesitan la URL pública absoluta
+    private Context newContext() {
+        Context context = new Context();
+        context.setVariable("logoUrl", backendUrl + "/images/pongrank-logo.jpg");
+        return context;
+    }
+
     @Override
     @Async("taskExecutor")
     public void sendWelcomeEmail(Player player) {
-        Context context = new Context();
+        Context context = newContext();
         context.setVariable("playerName", player.getName());
         context.setVariable("loginLink", frontendUrl + "/login");
 
@@ -52,7 +63,7 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async("taskExecutor")
     public void sendPasswordResetEmail(Player player, String resetLink, int expirationMinutes) {
-        Context context = new Context();
+        Context context = newContext();
         context.setVariable("playerName", player.getName());
         context.setVariable("resetLink", resetLink);
         context.setVariable("expirationMinutes", expirationMinutes);
@@ -63,7 +74,7 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async("taskExecutor")
     public void sendPaymentConfirmationEmail(Player player, MembershipPlan plan, BigDecimal amount, String transactionId) {
-        Context context = new Context();
+        Context context = newContext();
         context.setVariable("playerName", player.getName());
         context.setVariable("planName", plan.name());
         context.setVariable("amount", "S/ " + amount.toPlainString());
@@ -77,7 +88,7 @@ public class EmailServiceImpl implements EmailService {
     @Override
     @Async("taskExecutor")
     public void sendAccountDeletedEmail(Player player, MembershipPlan plan) {
-        Context context = new Context();
+        Context context = newContext();
         context.setVariable("playerName", player.getName());
         context.setVariable("planName", plan.name());
 
