@@ -178,8 +178,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "const res = pm.response.json();",
-                  "if (res.accessToken) {",
-                  "    pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "if (res.token) {",
+                  "    pm.collectionVariables.set('accessToken', res.token);",
                   "    pm.collectionVariables.set('refreshToken', res.refreshToken);",
                   "}",
                   "if (res.player && res.player.id) {",
