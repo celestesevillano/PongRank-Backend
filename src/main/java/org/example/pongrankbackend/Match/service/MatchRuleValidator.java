@@ -21,6 +21,7 @@ import java.util.Optional;
 public class MatchRuleValidator {
 
     public static final double MAX_LOCATION_DISTANCE_KM = 5.0;
+    public static final double MAX_LOCATION_RATING_GAP = 150.0;
     private static final double EARTH_RADIUS_KM = 6371.0;
 
     @Getter
@@ -48,7 +49,7 @@ public class MatchRuleValidator {
         switch (matchType) {
             case FRIEND -> validateFriendMatch(player2, friendshipOpt);
             case COMMUNITY -> validateCommunityMatch(dto);
-            case LOCATION -> validateLocationMatch(dto);
+            case LOCATION -> validateLocationMatch(player1, player2, dto);
             case TOURNAMENT -> validateTournamentMatch(player2);
         }
     }
@@ -75,7 +76,7 @@ public class MatchRuleValidator {
         }
     }
 
-    private void validateLocationMatch(MatchCreateRequestDTO dto) {
+    private void validateLocationMatch(Player player1, Player player2, MatchCreateRequestDTO dto) {
         if (dto.getLatitude() == null || dto.getLongitude() == null) {
             throw new InvalidMatchStateException("Para un partido por cercanía (LOCATION) se requiere latitud y longitud de ubicación");
         }
@@ -93,6 +94,24 @@ public class MatchRuleValidator {
                                 distance, MAX_LOCATION_DISTANCE_KM)
                 );
             }
+        }
+
+        if (player2 != null) {
+            validateRatingGap(player1, player2);
+        }
+    }
+
+    /**
+     * En LOCATION (modo "libres") no hay comunidad ni amistad que ya filtre el nivel del rival,
+     * así que el rating Glicko es la única señal disponible para evitar emparejamientos desbalanceados.
+     */
+    public void validateRatingGap(Player player1, Player player2) {
+        double ratingGap = Math.abs(player1.getRatingGlicko() - player2.getRatingGlicko());
+        if (ratingGap > MAX_LOCATION_RATING_GAP) {
+            throw new InvalidMatchStateException(
+                    String.format("La diferencia de nivel entre ambos jugadores (%.0f puntos de rating) excede el máximo permitido para un partido libre (%.0f puntos)",
+                            ratingGap, MAX_LOCATION_RATING_GAP)
+            );
         }
     }
 

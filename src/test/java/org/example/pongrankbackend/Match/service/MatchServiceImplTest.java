@@ -139,6 +139,136 @@ class MatchServiceImplTest {
     }
 
     @Test
+    @DisplayName("getOpenLocationMatchesNearby: excluye partidos propios y de nivel muy distinto")
+    void getOpenLocationMatchesNearby_FiltersOwnAndOutOfRatingRange() {
+        Long requesterId = 1L;
+        Player requester = createPlayer(requesterId, "Alice");
+        requester.setRatingGlicko(1500.0);
+
+        Player similarCreator = createPlayer(2L, "Bob");
+        similarCreator.setRatingGlicko(1550.0);
+        Match similarMatch = Match.builder().id(20L).player1(similarCreator).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED)
+                .latitude(new java.math.BigDecimal("-12.0")).longitude(new java.math.BigDecimal("-77.0")).build();
+
+        Player farRatingCreator = createPlayer(3L, "Carol");
+        farRatingCreator.setRatingGlicko(1500.0 + MatchRuleValidator.MAX_LOCATION_RATING_GAP + 50);
+        Match farRatingMatch = Match.builder().id(21L).player1(farRatingCreator).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED)
+                .latitude(new java.math.BigDecimal("-12.0")).longitude(new java.math.BigDecimal("-77.0")).build();
+
+        Match ownMatch = Match.builder().id(22L).player1(requester).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED)
+                .latitude(new java.math.BigDecimal("-12.0")).longitude(new java.math.BigDecimal("-77.0")).build();
+
+        when(playerRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+        when(matchRepository.findOpenChallenges(MatchStatus.CREATED, MatchType.LOCATION))
+                .thenReturn(List.of(similarMatch, farRatingMatch, ownMatch));
+        stubModelMapper(similarCreator);
+
+        List<MatchResponseDTO> result = matchService.getOpenLocationMatchesNearby(
+                requesterId, new java.math.BigDecimal("-12.0"), new java.math.BigDecimal("-77.0"));
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("joinOpenMatch: une al jugador como player2 y notifica al creador")
+    void joinOpenMatch_Success_SetsPlayer2AndNotifies() {
+        Long joinerId = 2L;
+        Player creator = createPlayer(1L, "Alice");
+        Player joiner = createPlayer(joinerId, "Bob");
+        Match openMatch = Match.builder().id(30L).player1(creator).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED)
+                .latitude(new java.math.BigDecimal("-12.0")).longitude(new java.math.BigDecimal("-77.0")).build();
+        MatchJoinRequestDTO dto = MatchJoinRequestDTO.builder()
+                .latitude(new java.math.BigDecimal("-12.001")).longitude(new java.math.BigDecimal("-77.001")).build();
+
+        when(matchRepository.findById(30L)).thenReturn(Optional.of(openMatch));
+        when(playerRepository.findById(joinerId)).thenReturn(Optional.of(joiner));
+        when(matchRepository.save(any(Match.class))).thenAnswer(inv -> inv.getArgument(0));
+        stubModelMapper(creator);
+        stubModelMapper(joiner);
+
+        MatchResponseDTO result = matchService.joinOpenMatch(joinerId, 30L, dto);
+
+        assertThat(result).isNotNull();
+        assertThat(openMatch.getPlayer2()).isEqualTo(joiner);
+        verify(matchRuleValidator).validateRatingGap(creator, joiner);
+        verify(webSocketNotifier).notifyMatchJoined(eq(1L), eq(result));
+    }
+
+    @Test
+    @DisplayName("joinOpenMatch: rechaza unirse a un partido que no es LOCATION")
+    void joinOpenMatch_NotLocationType_ThrowsException() {
+        Player creator = createPlayer(1L, "Alice");
+        Match friendMatch = Match.builder().id(31L).player1(creator).matchType(MatchType.FRIEND)
+                .status(MatchStatus.CREATED).build();
+        when(matchRepository.findById(31L)).thenReturn(Optional.of(friendMatch));
+
+        assertThatThrownBy(() -> matchService.joinOpenMatch(2L, 31L, MatchJoinRequestDTO.builder()
+                .latitude(java.math.BigDecimal.ZERO).longitude(java.math.BigDecimal.ZERO).build()))
+                .isInstanceOf(InvalidMatchStateException.class);
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("joinOpenMatch: rechaza un partido que ya tiene oponente")
+    void joinOpenMatch_AlreadyTaken_ThrowsException() {
+        Player creator = createPlayer(1L, "Alice");
+        Player existingOpponent = createPlayer(3L, "Carol");
+        Match takenMatch = Match.builder().id(32L).player1(creator).player2(existingOpponent)
+                .matchType(MatchType.LOCATION).status(MatchStatus.CREATED).build();
+        when(matchRepository.findById(32L)).thenReturn(Optional.of(takenMatch));
+
+        assertThatThrownBy(() -> matchService.joinOpenMatch(2L, 32L, MatchJoinRequestDTO.builder()
+                .latitude(java.math.BigDecimal.ZERO).longitude(java.math.BigDecimal.ZERO).build()))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.ConflictException.class);
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("joinOpenMatch: el creador no puede unirse a su propio partido")
+    void joinOpenMatch_OwnMatch_ThrowsException() {
+        Player creator = createPlayer(1L, "Alice");
+        Match ownMatch = Match.builder().id(33L).player1(creator).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED).build();
+        when(matchRepository.findById(33L)).thenReturn(Optional.of(ownMatch));
+
+        assertThatThrownBy(() -> matchService.joinOpenMatch(1L, 33L, MatchJoinRequestDTO.builder()
+                .latitude(java.math.BigDecimal.ZERO).longitude(java.math.BigDecimal.ZERO).build()))
+                .isInstanceOf(InvalidMatchStateException.class);
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("joinOpenMatch: rechaza si la distancia con el creador excede el máximo permitido")
+    void joinOpenMatch_TooFar_ThrowsException() {
+        Long joinerId = 2L;
+        Player creator = createPlayer(1L, "Alice");
+        Player joiner = createPlayer(joinerId, "Bob");
+        Match openMatch = Match.builder().id(34L).player1(creator).matchType(MatchType.LOCATION)
+                .status(MatchStatus.CREATED)
+                .latitude(new java.math.BigDecimal("-12.0")).longitude(new java.math.BigDecimal("-77.0")).build();
+        MatchJoinRequestDTO dto = MatchJoinRequestDTO.builder()
+                .latitude(new java.math.BigDecimal("-13.0")).longitude(new java.math.BigDecimal("-78.0")).build();
+
+        when(matchRepository.findById(34L)).thenReturn(Optional.of(openMatch));
+        when(playerRepository.findById(joinerId)).thenReturn(Optional.of(joiner));
+        when(matchRuleValidator.calculateDistanceKm(anyDouble(), anyDouble(), anyDouble(), anyDouble())).thenReturn(120.0);
+
+        assertThatThrownBy(() -> matchService.joinOpenMatch(joinerId, 34L, dto))
+                .isInstanceOf(InvalidMatchStateException.class)
+                .hasMessageContaining("distancia");
+
+        verify(matchRepository, never()).save(any());
+    }
+
+    @Test
     @DisplayName("shouldCreateMatchWhenValidTournamentRequest")
     void shouldCreateMatchWhenValidTournamentRequest() {
         // Arrange

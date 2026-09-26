@@ -2,6 +2,7 @@ package org.example.pongrankbackend.Match.repository;
 
 import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.Match.MatchStatus;
+import org.example.pongrankbackend.Match.MatchType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,9 +39,9 @@ public interface MatchRepository extends JpaRepository<Match, Long> {
     List<Match> findByCommunityIdAndStatus(@Param("communityId") Long communityId, @Param("status") MatchStatus status);
 
     @Query("SELECT m FROM Match m " +
-           "WHERE m.player2 IS NULL AND m.status = :status " +
+           "WHERE m.player2 IS NULL AND m.status = :status AND m.matchType = :matchType " +
            "ORDER BY m.createdAt DESC")
-    List<Match> findOpenChallenges(@Param("status") MatchStatus status);
+    List<Match> findOpenChallenges(@Param("status") MatchStatus status, @Param("matchType") MatchType matchType);
 
     List<Match> findByTournamentId(Long tournamentId);
 
