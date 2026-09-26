@@ -27,6 +27,7 @@ import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,6 +43,12 @@ public class ClubServiceImpl implements ClubService {
     private final ClubMembershipService clubMembershipService;
     private final MembershipService membershipService;
     private final ModelMapper modelMapper;
+
+    @Value("${club.max-administered.enterprise}")
+    private int maxAdministeredEnterprise;
+
+    @Value("${club.max-total.enterprise}")
+    private int maxTotalEnterprise;
 
     public ClubServiceImpl(ClubRepository clubRepository,
                            ClubReviewRepository clubReviewRepository,
@@ -62,11 +69,12 @@ public class ClubServiceImpl implements ClubService {
     public ClubResponseDTO registerClub(ClubRegisterRequestDTO dto) {
         Long requesterId = SecurityUtils.getRequiredCurrentUserId();
         Player requester = findPlayerById(requesterId);
-        validateCanAdministerClub(requesterId, null);
 
         if (!membershipService.canCreateClub(requesterId)) {
             throw new PlanRestrictionException("Solo los jugadores con plan ENTERPRISE pueden crear un club");
         }
+
+        validateCanAdministerClub(requesterId, null);
 
         String normalizedName = dto.getName().trim();
         validateNameIsAvailable(normalizedName);
@@ -173,6 +181,10 @@ public class ClubServiceImpl implements ClubService {
             throw new ConflictException("El nuevo administrador ya administra otro club en revisión o aprobado");
         }
 
+        if (!membershipService.canCreateClub(dto.getNewAdminPlayerId())) {
+            throw new PlanRestrictionException("El nuevo administrador debe tener plan ENTERPRISE para administrar un club");
+        }
+
         Player newAdmin = clubMembershipService.transferAdminRole(club, dto.getNewAdminPlayerId());
         club.setAdmin(newAdmin);
 
@@ -258,19 +270,24 @@ public class ClubServiceImpl implements ClubService {
         clubReviewRepository.save(review);
     }
 
-    // Single-club rule (D1): a player can only be responsible for one club in progress at a time.
-    // currentClubId excludes the club being resubmitted or approved; null when registering a new club.
+    // currentClubId excluye el club que se está reenviando o aprobando; null al registrar un club nuevo.
+    // Solo llega aquí un jugador que ya pasó el gate de canCreateClub (ENTERPRISE).
     private void validateCanAdministerClub(Long playerId, Long currentClubId) {
-        if (clubMembershipService.hasActiveMembershipOutsideClub(playerId, currentClubId)) {
-            throw new ConflictException("El jugador ya pertenece a otro club o tiene una solicitud de ingreso pendiente");
+        long totalClubs = clubMembershipService.countActiveMemberships(playerId);
+        int maxTotal = maxTotalEnterprise;
+
+        if (totalClubs >= maxTotal) {
+            throw new PlanRestrictionException("Alcanzaste el máximo de " + maxTotal
+                    + " club(es) que tu plan permite (crear o unirte)");
         }
 
-        boolean administersAnotherClub = currentClubId == null
-                ? clubRepository.existsByAdminIdAndStatusIn(playerId, ClubStatus.ACTIVE_STATUSES)
-                : clubRepository.existsByAdminIdAndStatusInAndIdNot(playerId, ClubStatus.ACTIVE_STATUSES, currentClubId);
+        long administeredClubs = currentClubId == null
+                ? clubRepository.countByAdminIdAndStatusIn(playerId, ClubStatus.ACTIVE_STATUSES)
+                : clubRepository.countByAdminIdAndStatusInAndIdNot(playerId, ClubStatus.ACTIVE_STATUSES, currentClubId);
 
-        if (administersAnotherClub) {
-            throw new ConflictException("El jugador ya administra otro club en revisión o aprobado");
+        if (administeredClubs >= maxAdministeredEnterprise) {
+            throw new ConflictException("El jugador ya alcanzó el máximo de " + maxAdministeredEnterprise
+                    + " club(es) que puede administrar según su plan");
         }
     }
 

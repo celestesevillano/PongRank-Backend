@@ -9,7 +9,9 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.FriendshipRequestException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +53,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.sendFriendRequest(playerId, dto))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(FriendshipRequestException.class)
                 .hasMessageContaining("a sí mismo");
 
         verify(friendshipRepository, never()).save(any());
@@ -84,7 +86,7 @@ class FriendshipServiceImplTest {
 
         when(playerRepository.findById(senderId)).thenReturn(Optional.of(sender));
         when(playerRepository.findById(receiverId)).thenReturn(Optional.of(receiver));
-        when(friendshipRepository.existsFriendshipBetween(senderId, receiverId)).thenReturn(false);
+        when(friendshipRepository.findFriendshipBetween(senderId, receiverId)).thenReturn(Optional.empty());
         when(friendshipRepository.save(any(Friendship.class))).thenReturn(savedFriendship);
         when(modelMapper.map(savedFriendship, FriendshipResponseDTO.class)).thenReturn(responseDto);
 
@@ -105,7 +107,7 @@ class FriendshipServiceImplTest {
     }
 
     @Test
-    @DisplayName("sendFriendRequest: impide crear solicitud si ya existe relación previa A->B o B->A")
+    @DisplayName("sendFriendRequest: impide crear solicitud si ya existe relación PENDING o ACCEPTED previa A->B o B->A")
     void sendFriendRequest_ExistingRelation_ThrowsException() {
         // Arrange
         Long senderId = 1L;
@@ -114,10 +116,12 @@ class FriendshipServiceImplTest {
 
         Player sender = Player.builder().id(senderId).build();
         Player receiver = Player.builder().id(receiverId).build();
+        Friendship existing = Friendship.builder().id(5L).playerA(sender).playerB(receiver)
+                .status(FriendshipStatus.ACCEPTED).build();
 
         when(playerRepository.findById(senderId)).thenReturn(Optional.of(sender));
         when(playerRepository.findById(receiverId)).thenReturn(Optional.of(receiver));
-        when(friendshipRepository.existsFriendshipBetween(senderId, receiverId)).thenReturn(true);
+        when(friendshipRepository.findFriendshipBetween(senderId, receiverId)).thenReturn(Optional.of(existing));
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.sendFriendRequest(senderId, dto))
@@ -125,6 +129,36 @@ class FriendshipServiceImplTest {
                 .hasMessageContaining("Ya existe una relación de amistad");
 
         verify(friendshipRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("sendFriendRequest: una solicitud REJECTED anterior sí permite reintentar")
+    void sendFriendRequest_PreviouslyRejected_AllowsRetry() {
+        // Arrange
+        Long senderId = 1L;
+        Long receiverId = 2L;
+        FriendshipRequestDTO dto = FriendshipRequestDTO.builder().receiverId(receiverId).build();
+
+        Player sender = Player.builder().id(senderId).name("Jugador A").build();
+        Player receiver = Player.builder().id(receiverId).name("Jugador B").build();
+        Friendship rejected = Friendship.builder().id(5L).playerA(receiver).playerB(sender)
+                .status(FriendshipStatus.REJECTED).build();
+
+        when(playerRepository.findById(senderId)).thenReturn(Optional.of(sender));
+        when(playerRepository.findById(receiverId)).thenReturn(Optional.of(receiver));
+        when(friendshipRepository.findFriendshipBetween(senderId, receiverId)).thenReturn(Optional.of(rejected));
+        when(friendshipRepository.save(rejected)).thenReturn(rejected);
+        when(modelMapper.map(rejected, FriendshipResponseDTO.class))
+                .thenReturn(FriendshipResponseDTO.builder().id(5L).status(FriendshipStatus.PENDING).build());
+
+        // Act
+        FriendshipResponseDTO result = friendshipService.sendFriendRequest(senderId, dto);
+
+        // Assert
+        assertThat(result.getStatus()).isEqualTo(FriendshipStatus.PENDING);
+        assertThat(rejected.getStatus()).isEqualTo(FriendshipStatus.PENDING);
+        assertThat(rejected.getPlayerA().getId()).isEqualTo(senderId);
+        assertThat(rejected.getPlayerB().getId()).isEqualTo(receiverId);
     }
 
     @Test
@@ -230,7 +264,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.acceptFriendRequest(friendshipId, playerAId))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedActionException.class)
                 .hasMessageContaining("Solo el receptor original puede aceptar");
 
         verify(friendshipRepository, never()).save(any());
@@ -257,7 +291,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.acceptFriendRequest(friendshipId, playerBId))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no está en estado PENDING");
 
         verify(friendshipRepository, never()).save(any());
@@ -284,7 +318,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.acceptFriendRequest(friendshipId, playerBId))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no está en estado PENDING");
 
         verify(friendshipRepository, never()).save(any());
@@ -354,7 +388,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.rejectFriendRequest(friendshipId, playerAId))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedActionException.class)
                 .hasMessageContaining("Solo el receptor original puede rechazar");
 
         verify(friendshipRepository, never()).save(any());
@@ -403,5 +437,109 @@ class FriendshipServiceImplTest {
         // Assert
         assertThat(result).hasSize(2);
         verify(friendshipRepository).findAllByPlayerIdAndStatus(playerId, FriendshipStatus.ACCEPTED);
+    }
+
+    // ----- cancelFriendRequest -----
+
+    @Test
+    @DisplayName("cancelFriendRequest: el emisor puede cancelar su propia solicitud PENDING")
+    void cancelFriendRequest_Success() {
+        Long friendshipId = 10L;
+        Player sender = Player.builder().id(1L).build();
+        Player receiver = Player.builder().id(2L).build();
+        Friendship friendship = Friendship.builder().id(friendshipId).playerA(sender).playerB(receiver)
+                .status(FriendshipStatus.PENDING).build();
+
+        when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
+
+        friendshipService.cancelFriendRequest(friendshipId, 1L);
+
+        verify(friendshipRepository).delete(friendship);
+    }
+
+    @Test
+    @DisplayName("cancelFriendRequest: solo quien envió la solicitud puede cancelarla")
+    void cancelFriendRequest_NotSender_ThrowsException() {
+        Long friendshipId = 10L;
+        Player sender = Player.builder().id(1L).build();
+        Player receiver = Player.builder().id(2L).build();
+        Friendship friendship = Friendship.builder().id(friendshipId).playerA(sender).playerB(receiver)
+                .status(FriendshipStatus.PENDING).build();
+
+        when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
+
+        assertThatThrownBy(() -> friendshipService.cancelFriendRequest(friendshipId, 2L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verify(friendshipRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("cancelFriendRequest: no se puede cancelar una solicitud ya resuelta")
+    void cancelFriendRequest_AlreadyResolved_ThrowsException() {
+        Long friendshipId = 10L;
+        Player sender = Player.builder().id(1L).build();
+        Player receiver = Player.builder().id(2L).build();
+        Friendship friendship = Friendship.builder().id(friendshipId).playerA(sender).playerB(receiver)
+                .status(FriendshipStatus.ACCEPTED).build();
+
+        when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
+
+        assertThatThrownBy(() -> friendshipService.cancelFriendRequest(friendshipId, 1L))
+                .isInstanceOf(ConflictException.class);
+
+        verify(friendshipRepository, never()).delete(any());
+    }
+
+    // ----- unfriend -----
+
+    @Test
+    @DisplayName("unfriend: cualquiera de los dos jugadores puede terminar una amistad ACCEPTED")
+    void unfriend_Success() {
+        Long friendshipId = 10L;
+        Player playerA = Player.builder().id(1L).build();
+        Player playerB = Player.builder().id(2L).build();
+        Friendship friendship = Friendship.builder().id(friendshipId).playerA(playerA).playerB(playerB)
+                .status(FriendshipStatus.ACCEPTED).build();
+
+        when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
+
+        friendshipService.unfriend(friendshipId, 2L);
+
+        verify(friendshipRepository).delete(friendship);
+    }
+
+    @Test
+    @DisplayName("unfriend: un jugador ajeno a la amistad no puede terminarla")
+    void unfriend_NotParticipant_ThrowsException() {
+        Long friendshipId = 10L;
+        Player playerA = Player.builder().id(1L).build();
+        Player playerB = Player.builder().id(2L).build();
+        Friendship friendship = Friendship.builder().id(friendshipId).playerA(playerA).playerB(playerB)
+                .status(FriendshipStatus.ACCEPTED).build();
+
+        when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
+
+        assertThatThrownBy(() -> friendshipService.unfriend(friendshipId, 99L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verify(friendshipRepository, never()).delete(any());
+    }
+
+    @Test
+    @DisplayName("unfriend: no se puede terminar una solicitud que no está ACCEPTED")
+    void unfriend_NotAccepted_ThrowsException() {
+        Long friendshipId = 10L;
+        Player playerA = Player.builder().id(1L).build();
+        Player playerB = Player.builder().id(2L).build();
+        Friendship friendship = Friendship.builder().id(friendshipId).playerA(playerA).playerB(playerB)
+                .status(FriendshipStatus.PENDING).build();
+
+        when(friendshipRepository.findById(friendshipId)).thenReturn(Optional.of(friendship));
+
+        assertThatThrownBy(() -> friendshipService.unfriend(friendshipId, 1L))
+                .isInstanceOf(ConflictException.class);
+
+        verify(friendshipRepository, never()).delete(any());
     }
 }

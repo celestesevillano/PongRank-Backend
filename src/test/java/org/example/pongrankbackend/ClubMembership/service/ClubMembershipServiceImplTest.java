@@ -5,6 +5,7 @@ import org.example.pongrankbackend.Club.ClubStatus;
 import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.ClubMembership.ClubMembership;
 import org.example.pongrankbackend.ClubMembership.ClubMembershipRole;
+import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.ClubMembership.ClubMembershipStatus;
 import org.example.pongrankbackend.ClubMembership.dto.ClubMembershipRequestDTO;
 import org.example.pongrankbackend.ClubMembership.repository.ClubMembershipRepository;
@@ -12,6 +13,7 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,6 +38,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -57,10 +60,22 @@ class ClubMembershipServiceImplTest {
     private PlayerRepository playerRepository;
 
     @Mock
+    private org.example.pongrankbackend.Membership.service.MembershipService membershipService;
+
+    @Mock
     private ModelMapper modelMapper;
 
     @InjectMocks
     private ClubMembershipServiceImpl clubMembershipService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(membershipService.getActivePlan(anyLong())).thenReturn(MembershipPlan.PRO);
+        org.springframework.test.util.ReflectionTestUtils.setField(clubMembershipService, "maxTotalFreemium", 0);
+        org.springframework.test.util.ReflectionTestUtils.setField(clubMembershipService, "maxTotalBasic", 2);
+        org.springframework.test.util.ReflectionTestUtils.setField(clubMembershipService, "maxTotalPro", 5);
+        org.springframework.test.util.ReflectionTestUtils.setField(clubMembershipService, "maxTotalEnterprise", 1);
+    }
 
     private Player player(Long id) {
         return Player.builder().id(id).name("Jugador " + id).build();
@@ -118,16 +133,32 @@ class ClubMembershipServiceImplTest {
     }
 
     @Test
-    @DisplayName("requestMembership: no permite pertenecer a dos clubes ni solicitudes pendientes múltiples o duplicadas")
-    void requestMembership_PlayerWithActiveMembership_ThrowsException() {
+    @DisplayName("requestMembership: no permite una solicitud duplicada al mismo club")
+    void requestMembership_DuplicateInSameClub_ThrowsException() {
         actingAs(PLAYER_ID);
         when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
-        when(clubMembershipRepository.existsByPlayerIdAndStatusIn(PLAYER_ID, ClubMembershipStatus.ACTIVE_STATUSES))
-                .thenReturn(true);
+        when(clubMembershipRepository.existsByPlayerIdAndClubIdAndStatusIn(
+                PLAYER_ID, CLUB_ID, ClubMembershipStatus.ACTIVE_STATUSES)).thenReturn(true);
 
         assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
                 .isInstanceOf(ConflictException.class);
+
+        verify(clubMembershipRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestMembership: no permite unirse a más clubes de los que su plan permite")
+    void requestMembership_ExceedsPlanLimit_ThrowsException() {
+        actingAs(PLAYER_ID);
+        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
+        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
+        when(membershipService.getActivePlan(PLAYER_ID)).thenReturn(MembershipPlan.BASIC);
+        when(clubMembershipRepository.countByPlayerIdAndStatusIn(PLAYER_ID, ClubMembershipStatus.ACTIVE_STATUSES))
+                .thenReturn(2L);
+
+        assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.PlanRestrictionException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }
@@ -142,6 +173,20 @@ class ClubMembershipServiceImplTest {
 
         assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
                 .isInstanceOf(ConflictException.class);
+
+        verify(clubMembershipRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("requestMembership: un jugador FREEMIUM no puede unirse a un club")
+    void requestMembership_FreemiumPlan_ThrowsException() {
+        actingAs(PLAYER_ID);
+        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
+        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
+        when(membershipService.getActivePlan(PLAYER_ID)).thenReturn(MembershipPlan.FREEMIUM);
+
+        assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.PlanRestrictionException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }
@@ -298,11 +343,12 @@ class ClubMembershipServiceImplTest {
         Club club = club(ClubStatus.APPROVED);
         when(clubMembershipRepository.findByPlayerIdAndClubIdAndStatus(ADMIN_ID, CLUB_ID, ClubMembershipStatus.APPROVED))
                 .thenReturn(Optional.empty());
-        when(clubMembershipRepository.existsByPlayerIdAndStatusInAndClubIdNot(
-                ADMIN_ID, ClubMembershipStatus.ACTIVE_STATUSES, CLUB_ID)).thenReturn(true);
+        when(membershipService.getActivePlan(ADMIN_ID)).thenReturn(MembershipPlan.ENTERPRISE);
+        when(clubMembershipRepository.countByPlayerIdAndStatusIn(ADMIN_ID, ClubMembershipStatus.ACTIVE_STATUSES))
+                .thenReturn(1L);
 
         assertThatThrownBy(() -> clubMembershipService.addAdminAsMember(club))
-                .isInstanceOf(ConflictException.class);
+                .isInstanceOf(org.example.pongrankbackend.common.exception.PlanRestrictionException.class);
 
         verify(clubMembershipRepository, never()).save(any());
     }
