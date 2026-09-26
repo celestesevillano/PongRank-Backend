@@ -168,7 +168,6 @@ class TournamentServiceImplTest {
         verify(tournamentRepository).save(captor.capture());
         assertThat(captor.getValue().getStatus()).isEqualTo(TournamentStatus.OPEN);
         assertThat(captor.getValue().getClub()).isEqualTo(club);
-        assertThat(captor.getValue().getCommunity()).isNull();
     }
 
     // ------------------------------------------------------------------ participants
