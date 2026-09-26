@@ -2351,7 +2351,7 @@
             "description": "Genera la preferencia de Checkout Pro y devuelve el link de pago para el plan elegido.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"plan\": \"PREMIUM\"\n}",
+              "raw": "{\n  \"plan\": \"BASIC\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2365,7 +2365,18 @@
           "name": "Webhook de MercadoPago",
           "request": {
             "method": "POST",
-            "header": [],
+            "header": [
+              {
+                "key": "x-signature",
+                "value": "ts=1700000000,v1=<hash calculado con MERCADOPAGO_WEBHOOK_SECRET>",
+                "description": "Opcional en local si no configuraste MERCADOPAGO_WEBHOOK_SECRET; si lo configuraste, el webhook responde 401 sin una firma válida."
+              },
+              {
+                "key": "x-request-id",
+                "value": "req-123456",
+                "description": "Va junto con x-signature en el hash que valida MercadoPago."
+              }
+            ],
             "url": {
               "raw": "{{baseUrl}}/api/v1/payments/webhook?type=payment&data.id=123456",
               "host": [
@@ -2378,7 +2389,7 @@
                 "webhook?type=payment&data.id=123456"
               ]
             },
-            "description": "Endpoint público que MercadoPago invoca al confirmarse un pago. Activa la membresía del jugador.",
+            "description": "Endpoint público que MercadoPago invoca al confirmarse un pago. Activa la membresía del jugador. Valida x-signature/x-request-id contra MERCADOPAGO_WEBHOOK_SECRET cuando está configurado.",
             "auth": {
               "type": "noauth"
             }
