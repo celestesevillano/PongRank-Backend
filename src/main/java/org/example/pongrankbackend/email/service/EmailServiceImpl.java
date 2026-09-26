@@ -46,7 +46,7 @@ public class EmailServiceImpl implements EmailService {
     // pueden cargar rutas relativas ni archivos locales, así que necesitan la URL pública absoluta
     private Context newContext() {
         Context context = new Context();
-        context.setVariable("logoUrl", backendUrl + "/images/pongrank-logo.jpg");
+        context.setVariable("logoUrl", backendUrl + "/images/pongrank-wordmark.png");
         return context;
     }
 
