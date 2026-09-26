@@ -27,7 +27,7 @@ import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
-import org.example.pongrankbackend.email.service.EmailService;
+import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
@@ -75,7 +75,7 @@ class PlayerServiceImplTest {
     private PasswordEncoder passwordEncoder;
 
     @Mock
-    private EmailService emailService;
+    private org.springframework.context.ApplicationEventPublisher eventPublisher;
 
     @Mock
     private ModelMapper modelMapper;
@@ -328,7 +328,7 @@ class PlayerServiceImplTest {
                 .hasMessageContaining("transferir la administración");
 
         verify(playerRepository, never()).save(any());
-        verify(emailService, never()).sendAccountDeletedEmail(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(AccountDeletedEvent.class));
     }
 
     @Test
@@ -354,7 +354,7 @@ class PlayerServiceImplTest {
                 .hasMessageContaining("UTEC");
 
         verify(playerRepository, never()).save(any());
-        verify(emailService, never()).sendAccountDeletedEmail(any(), any());
+        verify(eventPublisher, never()).publishEvent(any(AccountDeletedEvent.class));
     }
 
     @Test
@@ -387,7 +387,10 @@ class PlayerServiceImplTest {
         assertThat(clubMembership.getLeftAt()).isNotNull();
         assertThat(player.getStatus()).isEqualTo(PlayerStatus.DELETED);
         assertThat(player.getEmail()).startsWith("carlos@domain.com.deleted.1.");
-        verify(emailService).sendAccountDeletedEmail(player, MembershipPlan.PRO);
+        org.mockito.ArgumentCaptor<AccountDeletedEvent> captor = org.mockito.ArgumentCaptor.forClass(AccountDeletedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().getPlayerEmail()).isEqualTo("carlos@domain.com");
+        assertThat(captor.getValue().getPlan()).isEqualTo(MembershipPlan.PRO);
         verify(playerRepository).save(player);
     }
 }

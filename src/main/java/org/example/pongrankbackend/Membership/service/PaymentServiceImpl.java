@@ -15,14 +15,15 @@ import org.example.pongrankbackend.Membership.PaymentStatus;
 import org.example.pongrankbackend.Membership.PaymentTransaction;
 import org.example.pongrankbackend.Membership.dto.CreatePreferenceResponseDTO;
 import org.example.pongrankbackend.Membership.dto.PaymentStatusResponseDTO;
+import org.example.pongrankbackend.Membership.event.PaymentConfirmedEvent;
 import org.example.pongrankbackend.Membership.repository.PaymentTransactionRepository;
 import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
-import org.example.pongrankbackend.email.service.EmailService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +44,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final MembershipService membershipService;
     private final PaymentTransactionRepository paymentTransactionRepository;
-    private final EmailService emailService;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Value("${mercadopago.webhook-url}")
     private String webhookUrl;
@@ -64,10 +65,10 @@ public class PaymentServiceImpl implements PaymentService {
 
     public PaymentServiceImpl(MembershipService membershipService,
                                PaymentTransactionRepository paymentTransactionRepository,
-                               EmailService emailService) {
+                               ApplicationEventPublisher eventPublisher) {
         this.membershipService = membershipService;
         this.paymentTransactionRepository = paymentTransactionRepository;
-        this.emailService = emailService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -162,8 +163,8 @@ public class PaymentServiceImpl implements PaymentService {
                 return;
             }
             membershipService.activatePaidMembership(membership);
-            emailService.sendPaymentConfirmationEmail(
-                    membership.getPlayer(), membership.getPlan(), transaction.getAmount(), transaction.getId().toString());
+            eventPublisher.publishEvent(new PaymentConfirmedEvent(
+                    this, membership.getPlayer().getId(), membership.getPlan(), transaction.getAmount(), transaction.getId().toString()));
         }
     }
 
