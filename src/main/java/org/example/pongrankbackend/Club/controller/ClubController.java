@@ -11,11 +11,9 @@ import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
 import org.example.pongrankbackend.Club.service.ClubService;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
-import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -30,10 +28,8 @@ public class ClubController {
 
     @PostMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ClubResponseDTO> registerClub(
-            @AuthenticationPrincipal CustomUserDetails currentUser,
-            @Valid @RequestBody ClubRegisterRequestDTO dto) {
-        ClubResponseDTO response = clubService.registerClub(currentUser.getId(), dto);
+    public ResponseEntity<ClubResponseDTO> registerClub(@Valid @RequestBody ClubRegisterRequestDTO dto) {
+        ClubResponseDTO response = clubService.registerClub(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -55,18 +51,15 @@ public class ClubController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> updateClub(
             @PathVariable Long clubId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubUpdateRequestDTO dto) {
-        ClubResponseDTO response = clubService.updateClub(clubId, currentUser.getId(), dto);
+        ClubResponseDTO response = clubService.updateClub(clubId, dto);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/{clubId}/review")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ClubReviewResponseDTO> getClubReview(
-            @PathVariable Long clubId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        ClubReviewResponseDTO response = clubService.getClubReview(clubId, currentUser.getId());
+    public ResponseEntity<ClubReviewResponseDTO> getClubReview(@PathVariable Long clubId) {
+        ClubReviewResponseDTO response = clubService.getClubReview(clubId);
         return ResponseEntity.ok(response);
     }
 
@@ -74,9 +67,8 @@ public class ClubController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> resubmitClub(
             @PathVariable Long clubId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubResubmitRequestDTO dto) {
-        ClubResponseDTO response = clubService.resubmitClub(clubId, currentUser.getId(), dto);
+        ClubResponseDTO response = clubService.resubmitClub(clubId, dto);
         return ResponseEntity.ok(response);
     }
 
@@ -84,9 +76,8 @@ public class ClubController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> replaceAffiliationDocument(
             @PathVariable Long clubId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubAffiliationDocumentRequestDTO dto) {
-        ClubResponseDTO response = clubService.replaceAffiliationDocument(clubId, currentUser.getId(), dto);
+        ClubResponseDTO response = clubService.replaceAffiliationDocument(clubId, dto);
         return ResponseEntity.ok(response);
     }
 
@@ -94,9 +85,8 @@ public class ClubController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ClubResponseDTO> transferAdministration(
             @PathVariable Long clubId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody ClubAdminTransferRequestDTO dto) {
-        ClubResponseDTO response = clubService.transferAdministration(clubId, currentUser.getId(), dto);
+        ClubResponseDTO response = clubService.transferAdministration(clubId, dto);
         return ResponseEntity.ok(response);
     }
 }

@@ -38,6 +38,7 @@ import org.example.pongrankbackend.Tournament.integration.MatchOutcome;
 import org.example.pongrankbackend.Tournament.repository.TournamentMatchRepository;
 import org.example.pongrankbackend.Tournament.repository.TournamentParticipantRepository;
 import org.example.pongrankbackend.Tournament.repository.TournamentRepository;
+import org.example.pongrankbackend.security.SecurityUtils;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.example.pongrankbackend.common.exception.ConflictException;
@@ -101,13 +102,12 @@ public class TournamentServiceImpl implements TournamentService {
 
     // ------------------------------------------------------------------ organization
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public TournamentResponseDTO createTournament(Long actingPlayerId, TournamentCreateRequestDTO dto) {
+    public TournamentResponseDTO createTournament(TournamentCreateRequestDTO dto) {
         Club club = clubRepository.findById(dto.getClubId())
                 .orElseThrow(() -> new ResourceNotFoundException("Club no encontrado con ID: " + dto.getClubId()));
-        validateClubAdmin(club, actingPlayerId);
+        validateClubAdmin(club, SecurityUtils.getRequiredCurrentUserId());
 
         if (!club.canOrganizeTournaments()) {
             throw new ConflictException("Solo un club APPROVED puede organizar torneos");
@@ -151,12 +151,10 @@ public class TournamentServiceImpl implements TournamentService {
                 .toList();
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public TournamentParticipantResponseDTO addParticipant(Long tournamentId, Long actingPlayerId,
-                                                           TournamentParticipantRequestDTO dto) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+    public TournamentParticipantResponseDTO addParticipant(Long tournamentId, TournamentParticipantRequestDTO dto) {
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateStatus(tournament, TournamentStatus.OPEN, "Las inscripciones del torneo ya están cerradas");
 
         Player player = playerRepository.findById(dto.getPlayerId())
@@ -186,11 +184,10 @@ public class TournamentServiceImpl implements TournamentService {
         return toParticipantResponse(participant);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public void removeParticipant(Long tournamentId, Long playerId, Long actingPlayerId) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+    public void removeParticipant(Long tournamentId, Long playerId) {
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateStatus(tournament, TournamentStatus.OPEN, "La lista de participantes queda cerrada una vez iniciado el torneo");
 
         TournamentParticipant participant = participantRepository.findByTournamentIdAndPlayerId(tournamentId, playerId)
@@ -209,12 +206,10 @@ public class TournamentServiceImpl implements TournamentService {
         participantRepository.saveAll(remaining);
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public List<TournamentParticipantResponseDTO> updateSeeding(Long tournamentId, Long actingPlayerId,
-                                                                TournamentOrderedPlayersRequestDTO dto) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+    public List<TournamentParticipantResponseDTO> updateSeeding(Long tournamentId, TournamentOrderedPlayersRequestDTO dto) {
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateStatus(tournament, TournamentStatus.OPEN, "La siembra queda bloqueada una vez iniciado el torneo");
 
         List<TournamentParticipant> participants = participantRepository.findByTournamentIdOrderBySeedAsc(tournamentId);
@@ -240,11 +235,10 @@ public class TournamentServiceImpl implements TournamentService {
 
     // ------------------------------------------------------------------ group stage
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public TournamentResponseDTO startTournament(Long tournamentId, Long actingPlayerId) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+    public TournamentResponseDTO startTournament(Long tournamentId) {
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateStatus(tournament, TournamentStatus.OPEN, "El torneo ya fue iniciado");
 
         List<TournamentParticipant> participants = participantRepository.findByTournamentIdOrderBySeedAsc(tournamentId);
@@ -302,12 +296,11 @@ public class TournamentServiceImpl implements TournamentService {
         return toStandingsResponse(calculateGroups(findTournament(tournamentId)));
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public List<GroupStandingsResponseDTO> resolveGroupTie(Long tournamentId, Integer groupNumber, Long actingPlayerId,
+    public List<GroupStandingsResponseDTO> resolveGroupTie(Long tournamentId, Integer groupNumber,
                                                            TournamentOrderedPlayersRequestDTO dto) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateStatus(tournament, TournamentStatus.GROUP_STAGE, "Los empates solo se resuelven durante la fase de grupos");
 
         GroupData group = calculateGroups(tournament).stream()
@@ -337,11 +330,10 @@ public class TournamentServiceImpl implements TournamentService {
 
     // ------------------------------------------------------------------ knockout stage
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public TournamentResponseDTO generateKnockout(Long tournamentId, Long actingPlayerId, boolean allowSameGroupMatches) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+    public TournamentResponseDTO generateKnockout(Long tournamentId, boolean allowSameGroupMatches) {
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateStatus(tournament, TournamentStatus.GROUP_STAGE, "La llave solo se genera al terminar la fase de grupos");
 
         List<GroupData> groups = calculateGroups(tournament);
@@ -419,12 +411,11 @@ public class TournamentServiceImpl implements TournamentService {
 
     // ------------------------------------------------------------------ results
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public TournamentMatchResponseDTO declareWalkover(Long tournamentId, Long tournamentMatchId, Long actingPlayerId,
+    public TournamentMatchResponseDTO declareWalkover(Long tournamentId, Long tournamentMatchId,
                                                       TournamentWalkoverRequestDTO dto) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateInProgress(tournament);
 
         TournamentMatch match = tournamentMatchRepository.findById(tournamentMatchId)
@@ -453,11 +444,10 @@ public class TournamentServiceImpl implements TournamentService {
         return toMatchResponse(tournamentMatchRepository.save(match));
     }
 
-    // TODO: Replace actingPlayerId with the authenticated player obtained from the JWT (SecurityContext)
     @Override
     @Transactional
-    public TournamentResponseDTO syncMatchResults(Long tournamentId, Long actingPlayerId) {
-        Tournament tournament = findManagedTournament(tournamentId, actingPlayerId);
+    public TournamentResponseDTO syncMatchResults(Long tournamentId) {
+        Tournament tournament = findManagedTournament(tournamentId, SecurityUtils.getRequiredCurrentUserId());
         validateInProgress(tournament);
 
         for (TournamentMatch match : tournamentMatchRepository.findByTournamentIdOrderByIdAsc(tournamentId)) {

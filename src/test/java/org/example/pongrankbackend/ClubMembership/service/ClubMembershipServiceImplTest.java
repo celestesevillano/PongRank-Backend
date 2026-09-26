@@ -10,6 +10,8 @@ import org.example.pongrankbackend.ClubMembership.dto.ClubMembershipRequestDTO;
 import org.example.pongrankbackend.ClubMembership.repository.ClubMembershipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.security.CustomUserDetails;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,8 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.List;
 
 import java.util.Optional;
@@ -86,13 +90,27 @@ class ClubMembershipServiceImplTest {
         return ClubMembershipRequestDTO.builder().clubId(clubId).build();
     }
 
+    // Simula el JWT validado: pone al jugador dado como usuario autenticado actual
+    private void actingAs(Long playerId) {
+        CustomUserDetails userDetails = new CustomUserDetails(
+                Player.builder().id(playerId).name("Jugador " + playerId).role(org.example.pongrankbackend.Player.Role.ROLE_USER).build());
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities()));
+    }
+
+    @AfterEach
+    void clearSecurityContext() {
+        SecurityContextHolder.clearContext();
+    }
+
     @Test
     @DisplayName("requestMembership: solo se puede solicitar ingreso a clubes APPROVED")
     void requestMembership_ClubNotApproved_ThrowsException() {
+        actingAs(PLAYER_ID);
         when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
 
-        assertThatThrownBy(() -> clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID)))
+        assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no está aprobado");
 
@@ -102,12 +120,13 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("requestMembership: no permite pertenecer a dos clubes ni solicitudes pendientes múltiples o duplicadas")
     void requestMembership_PlayerWithActiveMembership_ThrowsException() {
+        actingAs(PLAYER_ID);
         when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
         when(clubMembershipRepository.existsByPlayerIdAndStatusIn(PLAYER_ID, ClubMembershipStatus.ACTIVE_STATUSES))
                 .thenReturn(true);
 
-        assertThatThrownBy(() -> clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID)))
+        assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
                 .isInstanceOf(ConflictException.class);
 
         verify(clubMembershipRepository, never()).save(any());
@@ -116,11 +135,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("requestMembership: el administrador de un club en curso no puede unirse a otro")
     void requestMembership_AdminOfActiveClub_ThrowsException() {
+        actingAs(PLAYER_ID);
         when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
         when(clubRepository.existsByAdminIdAndStatusIn(PLAYER_ID, ClubStatus.ACTIVE_STATUSES)).thenReturn(true);
 
-        assertThatThrownBy(() -> clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID)))
+        assertThatThrownBy(() -> clubMembershipService.requestMembership(requestFor(CLUB_ID)))
                 .isInstanceOf(ConflictException.class);
 
         verify(clubMembershipRepository, never()).save(any());
@@ -129,11 +149,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("requestMembership: la nueva solicitud comienza como PENDING con rol MEMBER")
     void requestMembership_Success_CreatesPendingRequest() {
+        actingAs(PLAYER_ID);
         when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player(PLAYER_ID)));
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
         when(clubMembershipRepository.save(any(ClubMembership.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        clubMembershipService.requestMembership(PLAYER_ID, requestFor(CLUB_ID));
+        clubMembershipService.requestMembership(requestFor(CLUB_ID));
 
         ArgumentCaptor<ClubMembership> captor = ArgumentCaptor.forClass(ClubMembership.class);
         verify(clubMembershipRepository).save(captor.capture());
@@ -145,11 +166,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("approveRequest: solo el administrador del club puede aprobar")
     void approveRequest_NotClubAdmin_ThrowsException() {
+        actingAs(OTHER_PLAYER_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.PENDING, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID, OTHER_PLAYER_ID))
+        assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID))
                 .isInstanceOf(UnauthorizedActionException.class);
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.PENDING);
@@ -158,11 +180,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("approveRequest: aprueba la solicitud y registra la fecha de ingreso")
     void approveRequest_Success_SetsJoinedAt() {
+        actingAs(ADMIN_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.PENDING, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        clubMembershipService.approveRequest(MEMBERSHIP_ID, ADMIN_ID);
+        clubMembershipService.approveRequest(MEMBERSHIP_ID);
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.APPROVED);
         assertThat(membership.getJoinedAt()).isNotNull();
@@ -171,11 +194,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("rejectRequest: la solicitud queda REJECTED y se conserva")
     void rejectRequest_Success_KeepsRecord() {
+        actingAs(ADMIN_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.PENDING, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        clubMembershipService.rejectRequest(MEMBERSHIP_ID, ADMIN_ID);
+        clubMembershipService.rejectRequest(MEMBERSHIP_ID);
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.REJECTED);
         verify(clubMembershipRepository, never()).delete(any());
@@ -184,22 +208,24 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("cancelRequest: solo el propio jugador puede cancelar su solicitud")
     void cancelRequest_OtherPlayer_ThrowsException() {
+        actingAs(OTHER_PLAYER_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.PENDING, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.cancelRequest(MEMBERSHIP_ID, OTHER_PLAYER_ID))
+        assertThatThrownBy(() -> clubMembershipService.cancelRequest(MEMBERSHIP_ID))
                 .isInstanceOf(UnauthorizedActionException.class);
     }
 
     @Test
     @DisplayName("cancelRequest: la solicitud pendiente queda CANCELLED")
     void cancelRequest_Success() {
+        actingAs(PLAYER_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.PENDING, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        clubMembershipService.cancelRequest(MEMBERSHIP_ID, PLAYER_ID);
+        clubMembershipService.cancelRequest(MEMBERSHIP_ID);
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.CANCELLED);
     }
@@ -207,11 +233,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("leaveClub: el administrador no puede abandonar su club sin transferir la administración")
     void leaveClub_ClubAdmin_ThrowsException() {
+        actingAs(ADMIN_ID);
         ClubMembership membership = membership(player(ADMIN_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.APPROVED, ClubMembershipRole.CLUB_ADMIN);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.leaveClub(MEMBERSHIP_ID, ADMIN_ID))
+        assertThatThrownBy(() -> clubMembershipService.leaveClub(MEMBERSHIP_ID))
                 .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("transferir");
 
@@ -221,11 +248,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("leaveClub: el miembro queda LEFT con fecha de salida y el registro se conserva")
     void leaveClub_Member_Success() {
+        actingAs(PLAYER_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.APPROVED, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        clubMembershipService.leaveClub(MEMBERSHIP_ID, PLAYER_ID);
+        clubMembershipService.leaveClub(MEMBERSHIP_ID);
 
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.LEFT);
         assertThat(membership.getLeftAt()).isNotNull();
@@ -321,11 +349,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("cancelRequest: no se puede cancelar una solicitud ya aprobada")
     void cancelRequest_AlreadyApproved_ThrowsException() {
+        actingAs(PLAYER_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.APPROVED, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.cancelRequest(MEMBERSHIP_ID, PLAYER_ID))
+        assertThatThrownBy(() -> clubMembershipService.cancelRequest(MEMBERSHIP_ID))
                 .isInstanceOf(ConflictException.class);
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.APPROVED);
     }
@@ -333,11 +362,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("approveRequest: no se puede aprobar dos veces la misma solicitud")
     void approveRequest_AlreadyApproved_ThrowsException() {
+        actingAs(ADMIN_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.APPROVED, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID, ADMIN_ID))
+        assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID))
                 .isInstanceOf(ConflictException.class);
         verify(clubMembershipRepository, never()).saveAndFlush(any());
     }
@@ -345,11 +375,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("rejectRequest: no se puede rechazar una solicitud ya resuelta (CANCELLED)")
     void rejectRequest_AlreadyResolved_ThrowsException() {
+        actingAs(ADMIN_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.APPROVED,
                 ClubMembershipStatus.CANCELLED, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.rejectRequest(MEMBERSHIP_ID, ADMIN_ID))
+        assertThatThrownBy(() -> clubMembershipService.rejectRequest(MEMBERSHIP_ID))
                 .isInstanceOf(ConflictException.class);
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.CANCELLED);
     }
@@ -357,11 +388,12 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("approveRequest: no aprueba si el club dejó de estar APPROVED (re-verificación)")
     void approveRequest_ClubUnderReverification_ThrowsException() {
+        actingAs(ADMIN_ID);
         ClubMembership membership = membership(player(PLAYER_ID), ClubStatus.PENDING,
                 ClubMembershipStatus.PENDING, ClubMembershipRole.MEMBER);
         when(clubMembershipRepository.findById(MEMBERSHIP_ID)).thenReturn(Optional.of(membership));
 
-        assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID, ADMIN_ID))
+        assertThatThrownBy(() -> clubMembershipService.approveRequest(MEMBERSHIP_ID))
                 .isInstanceOf(ConflictException.class);
         assertThat(membership.getStatus()).isEqualTo(ClubMembershipStatus.PENDING);
     }
@@ -394,9 +426,10 @@ class ClubMembershipServiceImplTest {
     @Test
     @DisplayName("getPendingRequests: solo el administrador del club puede listar solicitudes")
     void getPendingRequests_NotClubAdmin_ThrowsBeforeQuerying() {
+        actingAs(OTHER_PLAYER_ID);
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.APPROVED)));
 
-        assertThatThrownBy(() -> clubMembershipService.getPendingRequests(CLUB_ID, OTHER_PLAYER_ID, 0, 10))
+        assertThatThrownBy(() -> clubMembershipService.getPendingRequests(CLUB_ID, 0, 10))
                 .isInstanceOf(UnauthorizedActionException.class);
 
         verify(clubMembershipRepository, never()).findByClubIdAndStatus(any(), any(), any());
