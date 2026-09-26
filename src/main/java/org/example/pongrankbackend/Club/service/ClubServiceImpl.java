@@ -173,6 +173,10 @@ public class ClubServiceImpl implements ClubService {
             throw new ConflictException("El nuevo administrador ya administra otro club en revisión o aprobado");
         }
 
+        if (!membershipService.canCreateClub(dto.getNewAdminPlayerId())) {
+            throw new PlanRestrictionException("El nuevo administrador debe tener plan ENTERPRISE para administrar un club");
+        }
+
         Player newAdmin = clubMembershipService.transferAdminRole(club, dto.getNewAdminPlayerId());
         club.setAdmin(newAdmin);
 

@@ -344,6 +344,7 @@ class ClubServiceImplTest {
         ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
 
         when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(membershipService.canCreateClub(OTHER_PLAYER_ID)).thenReturn(true);
         when(clubMembershipService.transferAdminRole(club, OTHER_PLAYER_ID)).thenReturn(newAdmin);
 
         clubService.transferAdministration(CLUB_ID, dto);
@@ -365,6 +366,24 @@ class ClubServiceImplTest {
 
         assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID, dto))
                 .isInstanceOf(ConflictException.class);
+
+        verify(clubMembershipService, never()).transferAdminRole(any(), any());
+        assertThat(club.getAdmin().getId()).isEqualTo(ADMIN_ID);
+    }
+
+    @Test
+    @DisplayName("transferAdministration: no transfiere a un jugador sin plan ENTERPRISE")
+    void transferAdministration_NewAdminNotEnterprisePlan_ThrowsException() {
+        actingAs(ADMIN_ID, Role.ROLE_USER);
+        Club club = club(ClubStatus.APPROVED);
+        ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
+
+        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(membershipService.canCreateClub(OTHER_PLAYER_ID)).thenReturn(false);
+
+        assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID, dto))
+                .isInstanceOf(PlanRestrictionException.class)
+                .hasMessageContaining("ENTERPRISE");
 
         verify(clubMembershipService, never()).transferAdminRole(any(), any());
         assertThat(club.getAdmin().getId()).isEqualTo(ADMIN_ID);
