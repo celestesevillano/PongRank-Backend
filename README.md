@@ -81,6 +81,8 @@ Técnicamente, el problema exige justamente lo que el curso evalúa: un modelo r
 | **Entrenamiento** | Ingesta de métricas biomecánicas capturadas en el dispositivo del usuario mediante visión computacional. |
 | **Membresías y pagos** | Planes integrados con MercadoPago (Checkout Pro), webhook de confirmación y job programado que vence las membresías expiradas. |
 | **Tiempo real** | WebSockets con STOMP para retos y actualizaciones de marcador. |
+| **Correo transaccional** | Correos HTML de bienvenida, recuperación de contraseña y confirmación de pago, enviados de forma asíncrona con plantillas Thymeleaf. |
+| **Recuperación de contraseña** | Flujo de token de un solo uso con expiración: `/forgot-password` emite el enlace por correo y `/reset-password` lo canjea. |
 
 ### Tecnologías Utilizadas
 
@@ -92,6 +94,7 @@ Técnicamente, el problema exige justamente lo que el curso evalúa: un modelo r
 | Seguridad | Spring Security, JJWT, BCrypt |
 | Mapeo | ModelMapper |
 | Utilidades | Lombok |
+| Correo | Spring Boot Mail (JavaMailSender) + plantillas Thymeleaf |
 | API externa | MercadoPago SDK (Checkout Pro) |
 | Testing | JUnit 5, Mockito, AssertJ, Spring Security Test |
 | Documentación | Colección Postman |
@@ -102,7 +105,7 @@ Técnicamente, el problema exige justamente lo que el curso evalúa: un modelo r
 
 ## 4. Modelo de Entidades
 
-El dominio se compone de **15 entidades JPA**. Todas las colecciones usan `FetchType.LAZY` para evitar el problema de N+1 queries, y las relaciones muchos-a-muchos se modelan como entidades explícitas porque llevan atributos propios (rol, estado, fechas).
+El dominio se compone de **16 entidades JPA**. Todas las colecciones usan `FetchType.LAZY` para evitar el problema de N+1 queries, y las relaciones muchos-a-muchos se modelan como entidades explícitas porque llevan atributos propios (rol, estado, fechas).
 
 ```mermaid
 erDiagram
@@ -122,7 +125,6 @@ erDiagram
 
     PLAYER ||--o{ FRIENDSHIP : "solicita"
 
-    COMMUNITY ||--o{ TOURNAMENT : "organiza"
     CLUB ||--o{ TOURNAMENT : "aloja"
     TOURNAMENT ||--o{ TOURNAMENT_PARTICIPANT : "inscribe"
     PLAYER ||--o{ TOURNAMENT_PARTICIPANT : "participa"
@@ -132,6 +134,7 @@ erDiagram
     PLAYER ||--o{ TRAINING_SESSION : "entrena"
     PLAYER ||--o{ MEMBERSHIP : "contrata"
     MEMBERSHIP ||--o{ PAYMENT_TRANSACTION : "genera"
+    PLAYER ||--o{ PASSWORD_RESET_TOKEN : "solicita"
 ```
 
 ### Descripción de Entidades Principales
@@ -149,6 +152,8 @@ erDiagram
 **Friendship** — Relación reflexiva sobre `Player` con estados `PENDING`, `ACCEPTED` y `REJECTED`, y restricción única sobre el par.
 
 **Membership / PaymentTransaction** — Vinculan al jugador con su plan vigente y el historial de pagos.
+
+**PasswordResetToken** — Token de un solo uso con fecha de expiración y marca de consumido, que respalda el flujo de recuperación de contraseña sin exponer credenciales por correo.
 
 ### Decisiones de Diseño Destacadas
 
@@ -250,6 +255,12 @@ El cálculo de Glicko-2 se ejecuta con `@Async` por experiencia de usuario: el a
 
 `SchedulingConfig` y `MembershipExpirationScheduler` añaden un job diario que vence las membresías expiradas. Esa tarea debe ocurrir aunque nadie use el sistema, por lo que un scheduler —y no una petición— es el mecanismo adecuado.
 
+### Servicio de Correo Electrónico
+
+`EmailServiceImpl` envía correos HTML con `JavaMailSender` y plantillas Thymeleaf, en tres casos de uso: bienvenida al registrarse, enlace de recuperación de contraseña y confirmación de pago de membresía. Los tres métodos están anotados con `@Async("taskExecutor")` y comparten un método privado que construye el `MimeMessage` y captura los fallos de envío.
+
+La asincronía es imprescindible aquí: un servidor SMTP lento o caído no debe impedir que un jugador se registre ni que un pago se acredite. Al desacoplar el envío, un fallo de correo queda registrado sin propagarse a la transacción de negocio.
+
 ---
 
 ## 8. GitHub & Management
@@ -327,11 +338,11 @@ La colección **`postman_collection.json`** se encuentra en la raíz del reposit
 
 | Módulo | Endpoints |
 | :--- | :--- |
-| Autenticación | `POST /api/v1/auth/register`, `/login`, `/refresh` · `GET /me` |
+| Autenticación | `POST /api/v1/auth/register`, `/login`, `/refresh`, `/forgot-password`, `/reset-password` · `GET /me` |
 | Jugadores | `POST /api/v1/players/register` · `GET /{id}`, `/{id}/summary` · `PATCH /{id}` |
 | Amistades | `POST /api/v1/friendships/requests` · `PATCH /{id}/accept`, `/{id}/reject` · `GET /players/{id}`, `/players/{id}/pending` |
 | Comunidades | `POST/GET /api/v1/communities` · `GET /me`, `/{id}`, `/{id}/members`, `/{id}/ranking` · `PUT/DELETE /{id}` · `POST /{id}/members` · `PATCH /{id}/members/{playerId}/role` |
-| Partidos | `POST/GET /api/v1/matches` · `GET /{id}`, `/player/{playerId}` · `POST /{id}/submit` · `PUT /{id}/confirm`, `/{id}/dispute`, `/{id}/cancel` |
+| Partidos | `POST/GET /api/v1/matches` · `GET /open?latitude=&longitude=`, `/{id}`, `/player/{playerId}` · `POST /{id}/join`, `/{id}/submit` · `PUT /{id}/confirm`, `/{id}/dispute`, `/{id}/cancel` |
 | Sets | `GET /api/v1/matches/{matchId}/sets` · `GET /api/v1/match-sets/{setId}` |
 | Clubes | `POST/GET /api/v1/clubs` · `GET/PATCH /{id}` · revisión en `/api/v1/admin/clubs` |
 | Afiliaciones | `POST /api/v1/club-memberships` · `PATCH /{id}/approve`, `/reject`, `/cancel`, `/leave` |
@@ -345,7 +356,7 @@ La colección **`postman_collection.json`** se encuentra en la raíz del reposit
 
 ### Logros del Proyecto
 
-El backend implementa un dominio de **15 entidades** con relaciones no triviales: dos muchos-a-muchos con atributos propios, una reflexiva y una uno-a-uno opcional entre partidos casuales y de torneo. La arquitectura mantiene separación estricta en capas —controlador, servicio, repositorio— con inyección por constructor y sin lógica de negocio en los controladores. En seguridad se alcanzó autenticación stateless con JWT y refresh tokens, cifrado BCrypt, autorización en dos niveles y secretos exclusivamente por variables de entorno.
+El backend implementa un dominio de **16 entidades** con relaciones no triviales: dos muchos-a-muchos con atributos propios, una reflexiva y una uno-a-uno opcional entre partidos casuales y de torneo. La arquitectura mantiene separación estricta en capas —controlador, servicio, repositorio— con inyección por constructor y sin lógica de negocio en los controladores. En seguridad se alcanzó autenticación stateless con JWT y refresh tokens, cifrado BCrypt, autorización en dos niveles y secretos exclusivamente por variables de entorno.
 
 El sistema resuelve el problema identificado: un jugador puede registrarse, encontrar rivales de nivel similar, jugar partidos verificados por ambas partes, ver evolucionar su rating con una medida explícita de confianza estadística, y competir tanto en el ranking global como en el de su comunidad.
 
@@ -362,7 +373,6 @@ El sistema resuelve el problema identificado: un jugador puede registrarse, enco
 ### Trabajo Futuro
 
 - **Documentación OpenAPI/Swagger** generada automáticamente desde los controladores con springdoc.
-- **Servicio de correo transaccional** con plantillas HTML para confirmación de registro y recuperación de contraseña.
 - **Paginación en los listados restantes** de jugadores y amistades, homogeneizándolos con el resto de módulos.
 - **Almacenamiento en S3** para documentos de afiliación y fotos de perfil.
 - **Tests de integración** con TestContainers para validar consultas y constraints contra una base de datos real.
