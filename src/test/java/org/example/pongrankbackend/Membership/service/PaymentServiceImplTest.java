@@ -218,6 +218,33 @@ class PaymentServiceImplTest {
     }
 
     @Test
+    @DisplayName("processWebhookNotification: si la membresía ya estaba activa por otra transacción (reintento de pago), no la reactiva ni reenvía el correo")
+    void processWebhookNotification_MembershipAlreadyActive_DoesNotReactivateOrResendEmail() throws MPException, MPApiException {
+        Membership membership = Membership.builder().id(3L).status(MembershipStatus.ACTIVE).build();
+        PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.PENDING).build();
+        when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
+        when(paymentTransactionRepository.saveAndFlush(any(PaymentTransaction.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Payment fakePayment = mock(Payment.class);
+        when(fakePayment.getExternalReference()).thenReturn("42");
+        when(fakePayment.getStatus()).thenReturn("approved");
+
+        try (MockedConstruction<PaymentClient> mocked = mockConstruction(PaymentClient.class, (mockClient, context) -> {
+            try {
+                when(mockClient.get(anyLong())).thenReturn(fakePayment);
+            } catch (MPException | MPApiException e) {
+                throw new RuntimeException(e);
+            }
+        })) {
+            paymentService.processWebhookNotification("999");
+
+            assertThat(transaction.getStatus()).isEqualTo(PaymentStatus.APPROVED);
+            verify(membershipService, never()).activatePaidMembership(any());
+            verify(emailService, never()).sendPaymentConfirmationEmail(any(), any(), any(), any());
+        }
+    }
+
+    @Test
     @DisplayName("processWebhookNotification: si otra entrega concurrente del webhook ya actualizó la transacción, se ignora sin relanzar")
     void processWebhookNotification_ConcurrentDelivery_IsIgnored() throws MPException, MPApiException {
         Membership membership = Membership.builder().id(3L).status(MembershipStatus.PENDING).build();

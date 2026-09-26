@@ -10,6 +10,7 @@ import com.mercadopago.resources.payment.Payment;
 import com.mercadopago.resources.preference.Preference;
 import org.example.pongrankbackend.Membership.Membership;
 import org.example.pongrankbackend.Membership.MembershipPlan;
+import org.example.pongrankbackend.Membership.MembershipStatus;
 import org.example.pongrankbackend.Membership.PaymentStatus;
 import org.example.pongrankbackend.Membership.PaymentTransaction;
 import org.example.pongrankbackend.Membership.dto.CreatePreferenceResponseDTO;
@@ -153,6 +154,13 @@ public class PaymentServiceImpl implements PaymentService {
 
         if (transaction.getStatus() == PaymentStatus.APPROVED) {
             Membership membership = transaction.getMembership();
+            // Si el jugador reintentó el pago (ej. la primera preferencia quedó rejected y generó una
+            // nueva), pudo terminar con más de una transacción PENDING para la misma membresía. Si otra
+            // ya la activó, no la reactivamos ni reenviamos el correo de confirmación por esta también.
+            if (membership.getStatus() == MembershipStatus.ACTIVE) {
+                log.info("La membresía {} ya estaba activa; se registra el pago {} sin reactivarla", membership.getId(), transaction.getId());
+                return;
+            }
             membershipService.activatePaidMembership(membership);
             emailService.sendPaymentConfirmationEmail(
                     membership.getPlayer(), membership.getPlan(), transaction.getAmount(), transaction.getId().toString());
