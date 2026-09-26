@@ -39,6 +39,11 @@ public class PaymentTransaction {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
+    // Optimistic locking: MercadoPago puede reenviar el mismo webhook casi al mismo tiempo
+    // desde reintentos distintos; evita que ambos activen la membresía y envíen el correo dos veces
+    @Version
+    private Long version;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
