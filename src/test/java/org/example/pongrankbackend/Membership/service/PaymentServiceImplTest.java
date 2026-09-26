@@ -19,6 +19,7 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.email.service.EmailService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,9 @@ class PaymentServiceImplTest {
 
     @Mock
     private PaymentTransactionRepository paymentTransactionRepository;
+
+    @Mock
+    private EmailService emailService;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;

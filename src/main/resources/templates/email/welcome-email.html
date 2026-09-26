@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bienvenido a PongRank</title>
+</head>
+<body style="margin:0; padding:0; background-color:#0d0d0d; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0d0d0d; padding:32px 0;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#161616; border-radius:12px; overflow:hidden; border:1px solid #2a2a2a;">
+
+        <!-- Header / Logo -->
+        <tr>
+          <td align="center" style="background-color:#000000; padding:32px 24px 24px 24px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-family:Arial, Helvetica, sans-serif; font-size:28px; font-weight:bold; letter-spacing:1px;">
+                  <span style="color:#f5f5f5;">PONG</span><span style="color:#e0182b;">RANK</span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-top:4px; font-size:10px; letter-spacing:3px; color:#8a8a8a; text-transform:uppercase;">
+                  Juega. Compite. Mejora.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Accent bar -->
+        <tr>
+          <td style="height:4px; background-color:#e0182b; font-size:0; line-height:0;">&nbsp;</td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 32px 24px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" style="padding-bottom:8px;">
+                  <div style="width:64px; height:64px; background-color:#1f1f1f; border-radius:50%; border:2px solid #e0182b; text-align:center; line-height:64px; font-size:28px;">
+                    🏓
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-top:20px; padding-bottom:12px;">
+                  <span style="color:#f5f5f5; font-size:22px; font-weight:bold;">
+                    ¡Bienvenido, <span th:text="${playerName}">Jugador</span>!
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="color:#b3b3b3; font-size:14px; line-height:22px; padding-bottom:28px;">
+                  Tu cuenta en PongRank ya está lista. Juega partidas, únete a comunidades, compite en torneos y sube en el ranking.
+                </td>
+              </tr>
+
+              <!-- CTA button -->
+              <tr>
+                <td align="center" style="padding-bottom:28px;">
+                  <table role="presentation" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td align="center" style="background-color:#e0182b; border-radius:8px;">
+                        <a th:href="${loginLink}" href="#" style="display:inline-block; padding:14px 32px; font-size:14px; font-weight:bold; color:#ffffff; text-decoration:none; letter-spacing:0.5px;">
+                          IR A MI CUENTA
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Quick tips -->
+              <tr>
+                <td style="border-top:1px solid #2a2a2a; padding-top:24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding-bottom:12px; color:#8a8a8a; font-size:12px; text-transform:uppercase; letter-spacing:1px;">
+                        Para empezar
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0; color:#d6d6d6; font-size:13px; line-height:20px;">
+                        <span style="color:#e0182b; font-weight:bold;">1.</span>&nbsp; Juega tu primera partida
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0; color:#d6d6d6; font-size:13px; line-height:20px;">
+                        <span style="color:#e0182b; font-weight:bold;">2.</span>&nbsp; Únete a una comunidad de jugadores
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:6px 0; color:#d6d6d6; font-size:13px; line-height:20px;">
+                        <span style="color:#e0182b; font-weight:bold;">3.</span>&nbsp; Revisa tu ranking y tus estadísticas
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#000000; padding:20px 32px; text-align:center;">
+            <span style="color:#5c5c5c; font-size:11px; line-height:18px;">
+              Recibiste este correo porque creaste una cuenta en PongRank.<br>
+              &copy; PongRank — Juega. Compite. Mejora.
+            </span>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

@@ -18,6 +18,7 @@ import org.example.pongrankbackend.Membership.repository.PaymentTransactionRepos
 import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.email.service.EmailService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final MembershipService membershipService;
     private final PaymentTransactionRepository paymentTransactionRepository;
+    private final EmailService emailService;
 
     @Value("${mercadopago.webhook-url}")
     private String webhookUrl;
@@ -45,9 +47,11 @@ public class PaymentServiceImpl implements PaymentService {
     private BigDecimal enterprisePrice;
 
     public PaymentServiceImpl(MembershipService membershipService,
-                               PaymentTransactionRepository paymentTransactionRepository) {
+                               PaymentTransactionRepository paymentTransactionRepository,
+                               EmailService emailService) {
         this.membershipService = membershipService;
         this.paymentTransactionRepository = paymentTransactionRepository;
+        this.emailService = emailService;
     }
 
     @Override
@@ -127,7 +131,10 @@ public class PaymentServiceImpl implements PaymentService {
         paymentTransactionRepository.save(transaction);
 
         if (transaction.getStatus() == PaymentStatus.APPROVED) {
-            membershipService.activatePaidMembership(transaction.getMembership());
+            Membership membership = transaction.getMembership();
+            membershipService.activatePaidMembership(membership);
+            emailService.sendPaymentConfirmationEmail(
+                    membership.getPlayer(), membership.getPlan(), transaction.getAmount(), transaction.getId().toString());
         }
     }
 
