@@ -22,6 +22,7 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.CommunityMembershipException;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
@@ -324,7 +325,7 @@ public class CommunityServiceImpl implements CommunityService {
         long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
 
         if (createdActive >= limit) {
-            throw new CommunityMembershipException(
+            throw new PlanRestrictionException(
                     "Player " + playerId + " reached the maximum of " + limit + " active communities created for their plan");
         }
     }
@@ -337,7 +338,7 @@ public class CommunityServiceImpl implements CommunityService {
                 playerId, CommunityRole.MEMBER, MembershipStatus.ACTIVE);
 
         if (createdActive + activeMemberships >= limit) {
-            throw new CommunityMembershipException(
+            throw new PlanRestrictionException(
                     "Player " + playerId + " reached the maximum of " + limit + " total communities for their plan");
         }
     }
