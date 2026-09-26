@@ -1,0 +1,2334 @@
+{
+  "info": {
+    "name": "PongRank API v1",
+    "description": "Colección completa de la API REST de PongRank — CS 2031 Desarrollo Basado en Plataformas.\n\n**Uso:**\n1. Ajustar la variable `baseUrl` si el backend no corre en http://localhost:8080\n2. Ejecutar `1. Autenticación > Login`: el script guarda el `accessToken` automáticamente.\n3. El resto de peticiones heredan la autorización Bearer a nivel de colección.\n\nLas rutas públicas (registro, login, refresh y el webhook de MercadoPago) están marcadas como *No Auth*.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "playerId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "friendshipId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "communityId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "matchId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "setId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "clubId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "membershipId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "tournamentId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "tournamentMatchId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "groupNumber",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "transactionId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Autenticación",
+      "description": "Registro, login y renovación de sesión. El login guarda automáticamente el accessToken en las variables de la colección, por lo que el resto de carpetas heredan la autorización Bearer sin configuración adicional.",
+      "item": [
+        {
+          "name": "Registrar jugador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Crea una cuenta nueva. El email debe ser único y la contraseña se almacena cifrada con BCrypt. Devuelve 201 junto con los tokens.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Andrea Vidal\",\n  \"email\": \"andrea@utec.edu.pe\",\n  \"password\": \"Password123!\",\n  \"whatsapp\": \"+51987654321\",\n  \"shareContact\": false,\n  \"categoryFdptm\": \"SEGUNDA\",\n  \"federatedDeclared\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Autentica al jugador y emite el access token (24 h) y el refresh token (7 días). Ejecutar este request primero: el script de test guarda los tokens para todas las demás peticiones.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"andrea@utec.edu.pe\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', res.accessToken);",
+                  "    pm.collectionVariables.set('refreshToken', res.refreshToken);",
+                  "}",
+                  "if (res.player && res.player.id) {",
+                  "    pm.collectionVariables.set('playerId', res.player.id);",
+                  "}",
+                  "pm.test('Login exitoso (200)', function () { pm.response.to.have.status(200); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refrescar token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Emite un nuevo access token a partir del refresh token, sin pedir credenciales otra vez.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Olvidé mi contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/forgot-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Genera un token de un solo uso con expiración y envía por correo el enlace de recuperación. Responde 204 aunque el email no exista, para no revelar qué cuentas están registradas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"andrea@utec.edu.pe\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Restablecer contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/reset-password",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Canjea el token recibido por correo y fija la nueva contraseña. El token queda marcado como consumido y no puede reutilizarse.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"NuevaPassword123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Perfil autenticado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Devuelve los datos del jugador dueño del token. Sirve para verificar que la autorización Bearer está bien configurada."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Jugadores",
+      "description": "Gestión del perfil del jugador y sus valores de Glicko-2.",
+      "item": [
+        {
+          "name": "Registrar jugador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players",
+                "register"
+              ]
+            },
+            "description": "Alta de jugador delegada al servicio de autenticación. Responde 201.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Andrea Vidal\",\n  \"email\": \"andrea@utec.edu.pe\",\n  \"password\": \"Password123!\",\n  \"whatsapp\": \"+51987654321\",\n  \"shareContact\": false,\n  \"categoryFdptm\": \"SEGUNDA\",\n  \"federatedDeclared\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener jugador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players/{{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players",
+                "{{playerId}}"
+              ]
+            },
+            "description": "Perfil completo. El email y el WhatsApp solo se devuelven si el jugador activó compartir contacto, o si quien consulta es él mismo o un administrador."
+          },
+          "response": []
+        },
+        {
+          "name": "Resumen de jugador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players/{{playerId}}/summary",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players",
+                "{{playerId}}",
+                "summary"
+              ]
+            },
+            "description": "Vista pública reducida (id, nombre, rating y categoría). Es la que se embebe en rankings y listados de amistades."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar perfil",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players/{{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players",
+                "{{playerId}}"
+              ]
+            },
+            "description": "Actualización parcial: los campos nulos se ignoran. Solo el propio jugador o un administrador pueden modificarlo (403 en otro caso).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Andrea Vidal\",\n  \"whatsapp\": \"+51987654321\",\n  \"shareContact\": true,\n  \"categoryFdptm\": \"PRIMERA\",\n  \"federatedDeclared\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Eliminar mi cuenta",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players",
+                "me"
+              ]
+            },
+            "description": "Da de baja la cuenta del jugador autenticado. El identificador se toma del JWT, no de la URL, para que nadie pueda borrar una cuenta ajena."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Amistades",
+      "description": "Relación reflexiva entre jugadores con aceptación mutua. Habilita el reto directo y el filtro 'Amigos' del buscador de partidas.",
+      "item": [
+        {
+          "name": "Enviar solicitud",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/requests",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "requests"
+              ]
+            },
+            "description": "Crea una solicitud en estado PENDING. Devuelve 400 si el jugador se la envía a sí mismo y 409 si ya existe una relación entre ambos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"receiverId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Aceptar solicitud",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/{{friendshipId}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "{{friendshipId}}",
+                "accept"
+              ]
+            },
+            "description": "Solo el receptor original puede aceptar (403 en otro caso). Si la solicitud ya fue procesada responde 409."
+          },
+          "response": []
+        },
+        {
+          "name": "Rechazar solicitud",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/{{friendshipId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "{{friendshipId}}",
+                "reject"
+              ]
+            },
+            "description": "Mismas reglas que aceptar, pero deja la relación en estado REJECTED."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar amigos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/players/{{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "players",
+                "{{playerId}}"
+              ]
+            },
+            "description": "Devuelve las amistades en estado ACCEPTED del jugador indicado."
+          },
+          "response": []
+        },
+        {
+          "name": "Solicitudes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/players/{{playerId}}/pending",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "players",
+                "{{playerId}}",
+                "pending"
+              ]
+            },
+            "description": "Solicitudes recibidas aún sin responder. Solo el propio jugador o un administrador pueden consultarlas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Comunidades",
+      "description": "Grupos de juego con ranking interno. Los listados están paginados.",
+      "item": [
+        {
+          "name": "Crear comunidad",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities"
+              ]
+            },
+            "description": "El creador queda automáticamente como COMMUNITY_ADMIN. El número de comunidades permitidas depende del plan contratado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"UTEC Tenis de Mesa\",\n  \"description\": \"Comunidad de jugadores de UTEC\",\n  \"communityType\": \"UNIVERSITY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar comunidades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities?page=0&size=10"
+              ]
+            },
+            "description": "Listado paginado de comunidades activas. Las archivadas no aparecen."
+          },
+          "response": []
+        },
+        {
+          "name": "Mis comunidades",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "me"
+              ]
+            },
+            "description": "Comunidades en las que el jugador autenticado tiene membresía activa."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de comunidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}"
+              ]
+            },
+            "description": "Ficha completa con conteo de miembros."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar comunidad",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}"
+              ]
+            },
+            "description": "Requiere membresía activa con rol COMMUNITY_ADMIN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"UTEC Tenis de Mesa\",\n  \"description\": \"Descripción actualizada\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Archivar comunidad",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}"
+              ]
+            },
+            "description": "Borrado lógico: pasa a estado ARCHIVED para no dejar huérfano el historial de partidos que alimenta los ratings."
+          },
+          "response": []
+        },
+        {
+          "name": "Miembros",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/members?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "members?page=0&size=10"
+              ]
+            },
+            "description": "Listado paginado de miembros, resuelto con JOIN FETCH para evitar el problema de N+1 queries."
+          },
+          "response": []
+        },
+        {
+          "name": "Ranking de comunidad",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/ranking?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "ranking?page=0&size=10"
+              ]
+            },
+            "description": "Tabla de posiciones interna ordenada por rating Glicko-2."
+          },
+          "response": []
+        },
+        {
+          "name": "Agregar miembro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "members"
+              ]
+            },
+            "description": "Alta de membresía. Usa bloqueo pesimista para mantener consistentes los límites de miembros bajo concurrencia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar rol de miembro",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/members/{{playerId}}/role?role=COMMUNITY_ADMIN",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "members",
+                "{{playerId}}",
+                "role?role=COMMUNITY_ADMIN"
+              ]
+            },
+            "description": "Promueve o degrada a un miembro. Devuelve 409 si la operación dejaría a la comunidad sin administradores."
+          },
+          "response": []
+        },
+        {
+          "name": "Expulsar miembro",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/members/{{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "members",
+                "{{playerId}}"
+              ]
+            },
+            "description": "Da de baja la membresía cambiando su estado, sin borrar la fila."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Partidos",
+      "description": "Máquina de estados con doble confirmación: el resultado no afecta al ranking hasta que ambos jugadores lo validan.",
+      "item": [
+        {
+          "name": "Crear partida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches"
+              ]
+            },
+            "description": "Crea una partida. El oponente es opcional: si se omite, la partida queda abierta y aparece en el buscador. Un jugador solo puede tener una partida activa a la vez.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"opponentId\": 2,\n  \"format\": \"BO5\",\n  \"matchType\": \"FRIEND\",\n  \"communityId\": 1,\n  \"latitude\": -12.1349,\n  \"longitude\": -77.022\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar partidas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches?page=0&size=10"
+              ]
+            },
+            "description": "Listado paginado de partidas disponibles."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar partidas libres cercanas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/open?latitude=-12.1349&longitude=-77.0220",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "open?latitude=-12.1349&longitude=-77.0220"
+              ]
+            },
+            "description": "Buscador de rivales: devuelve las partidas abiertas cercanas al punto indicado, filtradas por nivel del jugador autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Unirse a partida abierta",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/join",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "join"
+              ]
+            },
+            "description": "El jugador toma una partida que quedó sin oponente. Falla si ya tiene una partida activa o si otro jugador se le adelantó."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de partida",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}"
+              ]
+            },
+            "description": "Incluye los sets jugados y el delta de rating aplicado."
+          },
+          "response": []
+        },
+        {
+          "name": "Partidas de un jugador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/player/{{playerId}}?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "player",
+                "{{playerId}}?page=0&size=10"
+              ]
+            },
+            "description": "Historial completo como jugador 1 o 2; habilita el head-to-head."
+          },
+          "response": []
+        },
+        {
+          "name": "Partidas de un torneo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/tournament/{{tournamentId}}?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "tournament",
+                "{{tournamentId}}?page=0&size=10"
+              ]
+            },
+            "description": "Partidas asociadas a una competición."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar marcador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/submit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "submit"
+              ]
+            },
+            "description": "El ganador envía todos los sets a la vez. Cada set se juega a 11 puntos con diferencia de 2. Deja la partida en espera de confirmación.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sets\": [\n    {\n      \"setNumber\": 1,\n      \"scorePlayer1\": 11,\n      \"scorePlayer2\": 8\n    },\n    {\n      \"setNumber\": 2,\n      \"scorePlayer1\": 9,\n      \"scorePlayer2\": 11\n    },\n    {\n      \"setNumber\": 3,\n      \"scorePlayer1\": 11,\n      \"scorePlayer2\": 7\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Confirmar resultado",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/confirm",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "confirm"
+              ]
+            },
+            "description": "El rival aprueba el marcador. Publica MatchConfirmedEvent, que dispara el recálculo asíncrono de Glicko-2 y la actualización del torneo si corresponde."
+          },
+          "response": []
+        },
+        {
+          "name": "Disputar resultado",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/dispute",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "dispute"
+              ]
+            },
+            "description": "El rival rechaza el marcador con un motivo. El partido queda en disputa y no afecta al ranking.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"El marcador del tercer set no coincide\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar partida",
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancela una partida antes de jugarse y libera el cupo de partida activa."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Sets de Partido",
+      "description": "Consulta del detalle set por set para reconstruir el resultado completo.",
+      "item": [
+        {
+          "name": "Sets de un partido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/matches/{{matchId}}/sets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "matches",
+                "{{matchId}}",
+                "sets"
+              ]
+            },
+            "description": "Devuelve los sets en orden, con el ganador de cada uno."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de un set",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/match-sets/{{setId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "match-sets",
+                "{{setId}}"
+              ]
+            },
+            "description": "Ficha de un set individual."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Clubes",
+      "description": "Modelo B2B: alta de clubes con documento de afiliación y revisión administrativa antes de quedar activos.",
+      "item": [
+        {
+          "name": "Registrar club",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs"
+              ]
+            },
+            "description": "Alta del club en estado pendiente de revisión. Quien lo registra queda como administrador del club.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Club Deportivo Lima\",\n  \"address\": \"Av. Larco 123, Miraflores\",\n  \"affiliationDocumentUrl\": \"https://ejemplo.com/afiliacion.pdf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar clubes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs?page=0&size=10"
+              ]
+            },
+            "description": "Listado paginado de clubes aprobados."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de club",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}"
+              ]
+            },
+            "description": "Ficha del club con su estado de afiliación."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar club",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}"
+              ]
+            },
+            "description": "Actualización parcial de los datos del club.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Club Deportivo Lima\",\n  \"address\": \"Av. Larco 456, Miraflores\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de revisiones",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "review"
+              ]
+            },
+            "description": "Auditoría completa: cada aprobación, rechazo y reenvío queda registrado."
+          },
+          "response": []
+        },
+        {
+          "name": "Reenviar afiliación",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/resubmit",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "resubmit"
+              ]
+            },
+            "description": "Vuelve a someter el club a revisión tras corregir el documento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"affiliationDocumentUrl\": \"https://ejemplo.com/afiliacion-v2.pdf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar documento",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/affiliation-document",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "affiliation-document"
+              ]
+            },
+            "description": "Reemplaza el documento de afiliación.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"affiliationDocumentUrl\": \"https://ejemplo.com/afiliacion-v3.pdf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Transferir administración",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/admin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "admin"
+              ]
+            },
+            "description": "Cede el rol de administrador a otro jugador.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newAdminPlayerId\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Administración de Clubes",
+      "description": "Rutas restringidas a ROLE_SYSTEM_ADMIN mediante hasRole en la configuración de seguridad. Con un token de usuario normal devuelven 403.",
+      "item": [
+        {
+          "name": "Clubes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/pending?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "pending?page=0&size=10"
+              ]
+            },
+            "description": "Cola de revisión de clubes aún sin aprobar."
+          },
+          "response": []
+        },
+        {
+          "name": "Aprobar club",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/{{clubId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "{{clubId}}",
+                "approve"
+              ]
+            },
+            "description": "Activa el club y habilita su gestión de socios y torneos."
+          },
+          "response": []
+        },
+        {
+          "name": "Rechazar club",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/{{clubId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "{{clubId}}",
+                "reject"
+              ]
+            },
+            "description": "Rechaza la afiliación indicando el motivo, que queda auditado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rejectionReason\": \"El documento de afiliación no es legible\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Revisiones de un club",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/admin/clubs/{{clubId}}/reviews",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "clubs",
+                "{{clubId}}",
+                "reviews"
+              ]
+            },
+            "description": "Historial de decisiones tomadas sobre ese club."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Afiliaciones a Clubes",
+      "description": "Solicitudes de los jugadores para asociarse a un club y su gestión.",
+      "item": [
+        {
+          "name": "Solicitar afiliación",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships"
+              ]
+            },
+            "description": "El jugador pide unirse a un club; queda pendiente de aprobación.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clubId\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Solicitudes pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/clubs/{{clubId}}/pending?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "clubs",
+                "{{clubId}}",
+                "pending?page=0&size=10"
+              ]
+            },
+            "description": "Cola de solicitudes del club, visible para su administrador."
+          },
+          "response": []
+        },
+        {
+          "name": "Socios del club",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/clubs/{{clubId}}/members?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "clubs",
+                "{{clubId}}",
+                "members?page=0&size=10"
+              ]
+            },
+            "description": "Listado paginado de socios activos."
+          },
+          "response": []
+        },
+        {
+          "name": "Afiliaciones de un jugador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/players/{{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "players",
+                "{{playerId}}"
+              ]
+            },
+            "description": "Clubes a los que pertenece o ha solicitado unirse el jugador."
+          },
+          "response": []
+        },
+        {
+          "name": "Aprobar afiliación",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/approve",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "approve"
+              ]
+            },
+            "description": "El administrador del club acepta al socio."
+          },
+          "response": []
+        },
+        {
+          "name": "Rechazar afiliación",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/reject",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "reject"
+              ]
+            },
+            "description": "El administrador del club rechaza la solicitud."
+          },
+          "response": []
+        },
+        {
+          "name": "Cancelar solicitud",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "cancel"
+              ]
+            },
+            "description": "El propio jugador retira su solicitud antes de ser revisada."
+          },
+          "response": []
+        },
+        {
+          "name": "Abandonar club",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/club-memberships/{{membershipId}}/leave",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "club-memberships",
+                "{{membershipId}}",
+                "leave"
+              ]
+            },
+            "description": "El socio se da de baja del club."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "10. Torneos",
+      "description": "Round-robin, eliminación directa y fase de grupos con clasificación a llaves, con generación automática de calendario y tablas.",
+      "item": [
+        {
+          "name": "Crear torneo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments"
+              ]
+            },
+            "description": "Define el torneo, su formato de partido y sus fechas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"clubId\": 1,\n  \"name\": \"Torneo Apertura 2026\",\n  \"type\": \"INTERNAL\",\n  \"matchFormat\": \"BO5\",\n  \"startDate\": \"2026-10-01T09:00:00\",\n  \"endDate\": \"2026-10-15T18:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de torneo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}"
+              ]
+            },
+            "description": "Estado actual del torneo y su configuración."
+          },
+          "response": []
+        },
+        {
+          "name": "Torneos de un club",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/clubs/{{clubId}}?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "clubs",
+                "{{clubId}}?page=0&size=10"
+              ]
+            },
+            "description": "Listado paginado de torneos organizados por el club."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar participantes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/participants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "participants"
+              ]
+            },
+            "description": "Inscritos con su seed y número de grupo."
+          },
+          "response": []
+        },
+        {
+          "name": "Inscribir participante",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/participants",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "participants"
+              ]
+            },
+            "description": "Añade un jugador al torneo antes de que arranque.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Retirar participante",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/participants/{{playerId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "participants",
+                "{{playerId}}"
+              ]
+            },
+            "description": "Da de baja a un inscrito."
+          },
+          "response": []
+        },
+        {
+          "name": "Definir seeding",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/seeding",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "seeding"
+              ]
+            },
+            "description": "Fija manualmente el orden de siembra antes del sorteo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderedPlayerIds\": [\n    1,\n    2,\n    3,\n    4\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Iniciar torneo",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/start",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "start"
+              ]
+            },
+            "description": "Distribuye los grupos y genera el calendario completo. A partir de aquí ya no se admiten inscripciones."
+          },
+          "response": []
+        },
+        {
+          "name": "Partidos del torneo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/matches",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "matches"
+              ]
+            },
+            "description": "Calendario generado, con el estado de cada cruce."
+          },
+          "response": []
+        },
+        {
+          "name": "Tablas de grupos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "groups"
+              ]
+            },
+            "description": "Posiciones por grupo con los criterios de desempate aplicados."
+          },
+          "response": []
+        },
+        {
+          "name": "Resolver empate",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/groups/{{groupNumber}}/tie-resolution",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "groups",
+                "{{groupNumber}}",
+                "tie-resolution"
+              ]
+            },
+            "description": "Desempate manual cuando los criterios automáticos no alcanzan.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderedPlayerIds\": [\n    1,\n    2\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generar llaves",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/knockout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "knockout"
+              ]
+            },
+            "description": "Construye el bracket de eliminación con los clasificados de grupos."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar walkover",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/matches/{{tournamentMatchId}}/walkover",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "matches",
+                "{{tournamentMatchId}}",
+                "walkover"
+              ]
+            },
+            "description": "Da por ganado un cruce por ausencia de un jugador y avanza el bracket.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"absentPlayerId\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sincronizar resultados",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/tournaments/{{tournamentId}}/sync-results",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "tournaments",
+                "{{tournamentId}}",
+                "sync-results"
+              ]
+            },
+            "description": "Reconcilia los partidos jugados con el estado del torneo."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "11. Sesiones de Entrenamiento",
+      "description": "Ingesta de métricas biomecánicas capturadas on-device con visión computacional (MediaPipe).",
+      "item": [
+        {
+          "name": "Registrar sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/training-sessions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "training-sessions"
+              ]
+            },
+            "description": "Guarda las métricas de una sesión de entrenamiento del jugador autenticado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"swingVelocityMax\": 18.4,\n  \"postureScore\": 82.5,\n  \"kneeFlexionAngle\": 34.2,\n  \"shoulderRotationAngle\": 61.8,\n  \"durationSeconds\": 900,\n  \"rawPoseKeypointsJson\": \"{\\\"frames\\\":[]}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sesiones de un jugador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/training-sessions/players/{{playerId}}?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "training-sessions",
+                "players",
+                "{{playerId}}?page=0&size=10"
+              ]
+            },
+            "description": "Historial paginado para ver el progreso postural en el tiempo."
+          },
+          "response": []
+        },
+        {
+          "name": "Mejor sesión",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/training-sessions/players/{{playerId}}/best",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "training-sessions",
+                "players",
+                "{{playerId}}",
+                "best"
+              ]
+            },
+            "description": "Sesión con el mejor puntaje postural registrado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "12. Membresías y Pagos",
+      "description": "Integración con MercadoPago (Checkout Pro). Usar siempre credenciales de sandbox en desarrollo.",
+      "item": [
+        {
+          "name": "Crear preferencia de pago",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/create-preference",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "create-preference"
+              ]
+            },
+            "description": "Genera la preferencia de Checkout Pro y devuelve el link de pago para el plan elegido.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"plan\": \"PREMIUM\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Webhook de MercadoPago",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/webhook?type=payment&data.id=123456",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "webhook?type=payment&data.id=123456"
+              ]
+            },
+            "description": "Endpoint público que MercadoPago invoca al confirmarse un pago. Activa la membresía del jugador.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Estado de transacción",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/payments/status/{{transactionId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "status",
+                "{{transactionId}}"
+              ]
+            },
+            "description": "Consulta el estado de un pago concreto."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
