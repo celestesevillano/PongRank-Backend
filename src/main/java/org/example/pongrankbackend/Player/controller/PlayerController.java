@@ -1,6 +1,7 @@
 package org.example.pongrankbackend.Player.controller;
 
 import jakarta.validation.Valid;
+import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
@@ -53,5 +54,12 @@ public class PlayerController {
         }
         PlayerResponseDTO response = playerService.updatePlayer(playerId, dto);
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteAccount(@Valid @RequestBody DeleteAccountRequestDTO dto) {
+        playerService.deleteAccount(dto);
+        return ResponseEntity.noContent().build();
     }
 }

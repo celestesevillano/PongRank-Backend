@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Cuenta eliminada — PongRank</title>
+<style>
+  :root { color-scheme: dark; supported-color-schemes: dark; }
+</style>
+</head>
+<body style="margin:0; padding:0; background-color:#0d0d0d; font-family:Arial, Helvetica, sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#0d0d0d; padding:32px 0;">
+  <tr>
+    <td align="center">
+      <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="background-color:#161616; border-radius:12px; overflow:hidden; border:1px solid #2a2a2a;">
+
+        <!-- Header / Logo -->
+        <tr>
+          <td align="center" style="background-color:#000000; padding:32px 24px 24px 24px;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-family:Arial, Helvetica, sans-serif; font-size:28px; font-weight:bold; letter-spacing:1px;">
+                  <span style="color:#f5f5f5;">PONG</span><span style="color:#e0182b;">RANK</span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-top:4px; font-size:10px; letter-spacing:3px; color:#8a8a8a; text-transform:uppercase;">
+                  Juega. Compite. Mejora.
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Accent bar -->
+        <tr>
+          <td style="height:4px; background-color:#e0182b; font-size:0; line-height:0;">&nbsp;</td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:36px 32px 24px 32px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" style="padding-bottom:8px;">
+                  <div style="width:64px; height:64px; background-color:#1f1f1f; border-radius:50%; border:2px solid #6b6b6b; text-align:center; line-height:64px; font-size:26px;">
+                    🔒
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="padding-top:20px; padding-bottom:12px;">
+                  <span style="color:#f5f5f5; font-size:22px; font-weight:bold;">
+                    Tu cuenta ha sido eliminada
+                  </span>
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="color:#b3b3b3; font-size:14px; line-height:22px; padding-bottom:8px;">
+                  Hola <span th:text="${playerName}" style="color:#f5f5f5; font-weight:bold;">Jugador</span>, confirmamos que tu cuenta y tus datos personales en PongRank fueron eliminados de forma permanente.
+                </td>
+              </tr>
+              <tr>
+                <td align="center" style="color:#8a8a8a; font-size:13px; line-height:20px; padding-bottom:28px;">
+                  Esta acción no se puede deshacer.
+                </td>
+              </tr>
+
+              <!-- What was lost -->
+              <tr>
+                <td style="border-top:1px solid #2a2a2a; padding-top:24px; padding-bottom:8px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="padding-bottom:14px; color:#8a8a8a; font-size:12px; text-transform:uppercase; letter-spacing:1px;">
+                        Se eliminó junto con tu cuenta
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 0; color:#d6d6d6; font-size:13px; line-height:20px;">
+                        <span style="color:#e0182b; font-weight:bold;">⚠</span>&nbsp; Tu ranking y todo tu historial de partidas
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 0; color:#d6d6d6; font-size:13px; line-height:20px; border-top:1px solid #232323;">
+                        <span style="color:#e0182b; font-weight:bold;">⚠</span>&nbsp; Tu membresía en las comunidades a las que pertenecías
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 0; color:#d6d6d6; font-size:13px; line-height:20px; border-top:1px solid #232323;">
+                        <span style="color:#e0182b; font-weight:bold;">⚠</span>&nbsp; Tu membresía o administración de club (si aplicaba)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:8px 0; color:#d6d6d6; font-size:13px; line-height:20px; border-top:1px solid #232323;">
+                        <span style="color:#e0182b; font-weight:bold;">⚠</span>&nbsp; Cualquier plan de membresía activo (<span th:text="${planName}">BASIC/PRO/ENTERPRISE</span>)
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+
+              <!-- Re-registration note -->
+              <tr>
+                <td style="padding-top:24px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#1f1f1f; border-radius:8px; border:1px solid #2a2a2a;">
+                    <tr>
+                      <td style="padding:16px 18px; color:#8a8a8a; font-size:12px; line-height:19px;">
+                        Si vuelves a registrarte con el mismo correo más adelante, será una cuenta completamente nueva — sin tu historial, ranking ni comunidades anteriores.
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color:#000000; padding:20px 32px; text-align:center;">
+            <span style="color:#5c5c5c; font-size:11px; line-height:18px;">
+              Recibiste este correo porque se eliminó una cuenta de PongRank asociada a esta dirección.<br>
+              &copy; PongRank — Juega. Compite. Mejora.
+            </span>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

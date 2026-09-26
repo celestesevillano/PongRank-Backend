@@ -74,6 +74,16 @@ public class EmailServiceImpl implements EmailService {
         send(player.getEmail(), "Pago confirmado — PongRank", "email/payment-confirmation-email", context);
     }
 
+    @Override
+    @Async("taskExecutor")
+    public void sendAccountDeletedEmail(Player player, MembershipPlan plan) {
+        Context context = new Context();
+        context.setVariable("playerName", player.getName());
+        context.setVariable("planName", plan.name());
+
+        send(player.getEmail(), "Tu cuenta ha sido eliminada — PongRank", "email/account-deleted-email", context);
+    }
+
     private void send(String to, String subject, String template, Context context) {
         try {
             String html = templateEngine.process(template, context);
