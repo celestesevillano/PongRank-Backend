@@ -369,7 +369,7 @@ class CommunityServiceImplTest {
             givenActiveCommunitiesCreated(1L);
             givenRejectedCreationPath();
 
-            thenFailsWith(HttpStatus.CONFLICT,
+            thenFailsWith(HttpStatus.FORBIDDEN,
                     () -> communityService.createCommunity(createRequest(), CREATOR_ID));
 
             verify(communityRepository, never()).save(any());
@@ -382,7 +382,7 @@ class CommunityServiceImplTest {
             givenActiveCommunitiesCreated(2L);
             givenRejectedCreationPath();
 
-            thenFailsWith(HttpStatus.CONFLICT,
+            thenFailsWith(HttpStatus.FORBIDDEN,
                     () -> communityService.createCommunity(createRequest(), CREATOR_ID));
 
             verify(communityRepository, never()).save(any());
@@ -407,7 +407,7 @@ class CommunityServiceImplTest {
             givenActiveCommunitiesCreated(5L);
             givenRejectedCreationPath();
 
-            thenFailsWith(HttpStatus.CONFLICT,
+            thenFailsWith(HttpStatus.FORBIDDEN,
                     () -> communityService.createCommunity(createRequest(), CREATOR_ID));
 
             verify(communityRepository, never()).save(any());
@@ -420,7 +420,7 @@ class CommunityServiceImplTest {
             givenActiveCommunitiesCreated(6L);
             givenRejectedCreationPath();
 
-            thenFailsWith(HttpStatus.CONFLICT,
+            thenFailsWith(HttpStatus.FORBIDDEN,
                     () -> communityService.createCommunity(createRequest(), CREATOR_ID));
 
             verify(communityRepository, never()).save(any());
@@ -467,7 +467,7 @@ class CommunityServiceImplTest {
             givenActiveMemberships(1L);
             givenJoinRejected();
 
-            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+            thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
                     COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
         }
 
@@ -479,7 +479,7 @@ class CommunityServiceImplTest {
             givenActiveMemberships(2L);
             givenJoinRejected();
 
-            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+            thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
                     COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
         }
 
@@ -506,7 +506,7 @@ class CommunityServiceImplTest {
             givenActiveMemberships(2L);
             givenJoinRejected();
 
-            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+            thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
                     COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
         }
 
@@ -518,7 +518,7 @@ class CommunityServiceImplTest {
             givenActiveMemberships(3L);
             givenJoinRejected();
 
-            thenFailsWith(HttpStatus.CONFLICT, () -> communityService.addMember(
+            thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
                     COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
         }
     }

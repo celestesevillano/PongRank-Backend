@@ -7,8 +7,8 @@ import org.example.pongrankbackend.TrainingSession.TrainingSession;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
 import org.example.pongrankbackend.TrainingSession.repository.TrainingSessionRepository;
+import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
-import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -114,7 +114,7 @@ class TrainingSessionServiceImplTest {
     }
 
     @Test
-    @DisplayName("registerSession: lanza UnauthorizedActionException cuando el jugador no tiene acceso al Coach (solo PRO/ENTERPRISE)")
+    @DisplayName("registerSession: lanza PlanRestrictionException cuando el jugador no tiene acceso al Coach (solo PRO/ENTERPRISE)")
     void registerSession_NoCoachAccess_ThrowsException() {
         // Arrange
         Long playerId = 1L;
@@ -126,7 +126,7 @@ class TrainingSessionServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> trainingSessionService.registerSession(playerId, dto))
-                .isInstanceOf(UnauthorizedActionException.class)
+                .isInstanceOf(PlanRestrictionException.class)
                 .hasMessageContaining("PRO o ENTERPRISE");
 
         verify(trainingSessionRepository, never()).save(any());

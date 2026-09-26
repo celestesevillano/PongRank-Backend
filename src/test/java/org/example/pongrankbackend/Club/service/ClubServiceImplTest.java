@@ -24,6 +24,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.PlanRestrictionException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
@@ -138,7 +139,7 @@ class ClubServiceImplTest {
         when(membershipService.canCreateClub(ADMIN_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> clubService.registerClub(ADMIN_ID, dto))
-                .isInstanceOf(UnauthorizedActionException.class)
+                .isInstanceOf(PlanRestrictionException.class)
                 .hasMessageContaining("ENTERPRISE");
 
         verify(clubRepository, never()).save(any());
