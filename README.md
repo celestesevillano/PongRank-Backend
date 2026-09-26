@@ -2,7 +2,7 @@
 
 **Curso:** CS 2031 — Desarrollo Basado en Plataformas · **Entrega:** Semana 7
 **Repositorio:** https://github.com/celestesevillano/PongRank-Backend
-**Despliegue:** _[PEGAR URL DEL DEPLOYMENT]_
+**Despliegue:** http://54.80.228.129:8080 (AWS EC2 + RDS)
 
 ### Integrantes
 
@@ -162,7 +162,7 @@ cd PongRank-Backend && docker compose up -d
 cp .env.example .env && ./mvnw spring-boot:run
 ```
 
-La API queda en `http://localhost:8080`. La colección **`postman_collection.json`** está en la raíz, con los **80 endpoints** documentados, variables y autorización Bearer: basta ejecutar *Login* y el token se guarda solo.
+La API queda en `http://localhost:8080`. La instancia desplegada está en `http://54.80.228.129:8080` (AWS EC2 + RDS). La colección **`postman_collection.json`** está en la raíz, con los **80 endpoints** documentados, variables y autorización Bearer: basta ejecutar *Login* y el token se guarda solo.
 
 Rutas base bajo `/api/v1`: `auth` (6, incluye `/forgot-password` y `/reset-password`), `players` (5, incluye `DELETE /players/me`), `friendships` (5), `communities` (11), `matches` y `match-sets` (13, incluye `GET /matches/open` y `POST /{id}/join`), `clubs`, `club-memberships` y `admin/clubs` (20), `tournaments` (14), `training-sessions` (3) y `payments` (3).
 

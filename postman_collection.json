@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "PongRank API v1",
-    "description": "Colección completa de la API REST de PongRank — CS 2031 Desarrollo Basado en Plataformas.\n\n**Uso:**\n1. Ajustar la variable `baseUrl` si el backend no corre en http://localhost:8080\n2. Ejecutar `1. Autenticación > Login`: el script guarda el `accessToken` automáticamente.\n3. El resto de peticiones heredan la autorización Bearer a nivel de colección.\n\nLas rutas públicas (registro, login, refresh y el webhook de MercadoPago) están marcadas como *No Auth*.",
+    "description": "Colección completa de la API REST de PongRank — CS 2031 Desarrollo Basado en Plataformas.\n\n**Uso:**\n1. La variable `baseUrl` ya apunta al deployment en AWS (http://54.80.228.129:8080). Cámbiala a http://localhost:8080 si prefieres correr el backend en local.\n2. Ejecutar `1. Autenticación > Login`: el script guarda el `accessToken` automáticamente.\n3. El resto de peticiones heredan la autorización Bearer a nivel de colección.\n\nLas rutas públicas (registro, login, refresh y el webhook de MercadoPago) están marcadas como *No Auth*.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -17,7 +17,7 @@
   "variable": [
     {
       "key": "baseUrl",
-      "value": "http://localhost:8080",
+      "value": "http://54.80.228.129:8080",
       "type": "string"
     },
     {
