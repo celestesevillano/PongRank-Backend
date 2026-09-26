@@ -8,7 +8,9 @@ import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.FriendshipRequestException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,8 +39,7 @@ public class FriendshipServiceImpl implements FriendshipService {
         Long receiverId = dto.getReceiverId();
 
         if (senderId.equals(receiverId)) {
-            // TODO: Replace with custom BadRequestException
-            throw new IllegalArgumentException("Un jugador no puede enviarse una solicitud de amistad a sí mismo");
+            throw new FriendshipRequestException("Un jugador no puede enviarse una solicitud de amistad a sí mismo");
         }
 
         Player sender = playerRepository.findById(senderId)
@@ -68,13 +69,11 @@ public class FriendshipServiceImpl implements FriendshipService {
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud de amistad no encontrada con ID: " + friendshipId));
 
         if (!friendship.getPlayerB().getId().equals(actingPlayerId)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el receptor original puede aceptar la solicitud de amistad");
+            throw new UnauthorizedActionException("Solo el receptor original puede aceptar la solicitud de amistad");
         }
 
         if (friendship.getStatus() != FriendshipStatus.PENDING) {
-            // TODO: Replace with custom IllegalStateException
-            throw new IllegalStateException("La solicitud de amistad ya fue procesada o no está en estado PENDING");
+            throw new ConflictException("La solicitud de amistad ya fue procesada o no está en estado PENDING");
         }
 
         friendship.setStatus(FriendshipStatus.ACCEPTED);
@@ -89,13 +88,11 @@ public class FriendshipServiceImpl implements FriendshipService {
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud de amistad no encontrada con ID: " + friendshipId));
 
         if (!friendship.getPlayerB().getId().equals(actingPlayerId)) {
-            // TODO: Replace with custom ForbiddenException / AccessDeniedException
-            throw new IllegalArgumentException("Solo el receptor original puede rechazar la solicitud de amistad");
+            throw new UnauthorizedActionException("Solo el receptor original puede rechazar la solicitud de amistad");
         }
 
         if (friendship.getStatus() != FriendshipStatus.PENDING) {
-            // TODO: Replace with custom IllegalStateException
-            throw new IllegalStateException("La solicitud de amistad ya fue procesada o no está en estado PENDING");
+            throw new ConflictException("La solicitud de amistad ya fue procesada o no está en estado PENDING");
         }
 
         friendship.setStatus(FriendshipStatus.REJECTED);
