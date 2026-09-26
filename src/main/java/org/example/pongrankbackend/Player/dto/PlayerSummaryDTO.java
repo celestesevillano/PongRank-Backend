@@ -16,4 +16,7 @@ public class PlayerSummaryDTO {
     private Double ratingGlicko;
     private String categoryFdptm;
     private Boolean federatedDeclared;
+
+    // null salvo que el jugador tenga shareContact=true (ver ModelMapperConfig)
+    private String whatsapp;
 }
