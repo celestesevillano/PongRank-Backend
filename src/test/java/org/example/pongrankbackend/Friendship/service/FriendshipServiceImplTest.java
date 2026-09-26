@@ -9,7 +9,9 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.FriendshipRequestException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,7 +53,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.sendFriendRequest(playerId, dto))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(FriendshipRequestException.class)
                 .hasMessageContaining("a sí mismo");
 
         verify(friendshipRepository, never()).save(any());
@@ -230,7 +232,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.acceptFriendRequest(friendshipId, playerAId))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedActionException.class)
                 .hasMessageContaining("Solo el receptor original puede aceptar");
 
         verify(friendshipRepository, never()).save(any());
@@ -257,7 +259,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.acceptFriendRequest(friendshipId, playerBId))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no está en estado PENDING");
 
         verify(friendshipRepository, never()).save(any());
@@ -284,7 +286,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.acceptFriendRequest(friendshipId, playerBId))
-                .isInstanceOf(IllegalStateException.class)
+                .isInstanceOf(ConflictException.class)
                 .hasMessageContaining("no está en estado PENDING");
 
         verify(friendshipRepository, never()).save(any());
@@ -354,7 +356,7 @@ class FriendshipServiceImplTest {
 
         // Act & Assert
         assertThatThrownBy(() -> friendshipService.rejectFriendRequest(friendshipId, playerAId))
-                .isInstanceOf(IllegalArgumentException.class)
+                .isInstanceOf(UnauthorizedActionException.class)
                 .hasMessageContaining("Solo el receptor original puede rechazar");
 
         verify(friendshipRepository, never()).save(any());
