@@ -30,11 +30,11 @@ import org.example.pongrankbackend.Tournament.repository.TournamentParticipantRe
 import org.example.pongrankbackend.Tournament.repository.TournamentRepository;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -80,8 +80,30 @@ class TournamentServiceImplTest {
     @Spy private GroupStandingsCalculator standingsCalculator = new GroupStandingsCalculator();
     @Spy private KnockoutBracketBuilder bracketBuilder = new KnockoutBracketBuilder();
 
-    @InjectMocks
     private TournamentServiceImpl tournamentService;
+
+    @BeforeEach
+    void setUp() {
+        TournamentAccessPolicy accessPolicy = new TournamentAccessPolicy(tournamentRepository, clubMembershipService);
+        TournamentMapper tournamentMapper = new TournamentMapper(modelMapper);
+        TournamentGroupStandings groupStandings = new TournamentGroupStandings(
+                participantRepository, tournamentMatchRepository, standingsCalculator, modelMapper);
+        TournamentMatchScheduler matchScheduler = new TournamentMatchScheduler(matchIntegrationPort);
+
+        TournamentRegistrationService registrationService = new TournamentRegistrationServiceImpl(
+                tournamentRepository, participantRepository, clubRepository, playerRepository,
+                accessPolicy, tournamentMapper);
+        TournamentBracketService bracketService = new TournamentBracketServiceImpl(
+                tournamentRepository, participantRepository, tournamentMatchRepository, groupDistributor,
+                roundRobinScheduler, bracketBuilder, accessPolicy, tournamentMapper, groupStandings, matchScheduler);
+        TournamentResultsService resultsService = new TournamentResultsServiceImpl(
+                tournamentRepository, tournamentMatchRepository, matchIntegrationPort,
+                accessPolicy, tournamentMapper, matchScheduler);
+
+        tournamentService = new TournamentServiceImpl(
+                clubRepository, tournamentRepository, participantRepository, tournamentMatchRepository,
+                accessPolicy, tournamentMapper, groupStandings, registrationService, bracketService, resultsService);
+    }
 
     private Player player(Long id, double rating) {
         return Player.builder().id(id).name("Jugador " + id).ratingGlicko(rating).status(PlayerStatus.ACTIVE).build();
