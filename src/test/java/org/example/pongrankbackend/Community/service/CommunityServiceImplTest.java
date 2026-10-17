@@ -23,7 +23,6 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
@@ -39,7 +38,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("CommunityServiceImpl")
+@DisplayName("CommunityServiceImpl (con CommunityMemberService, CommunityPlanLimits, CommunityAccessPolicy y CommunityMapper reales)")
 class CommunityServiceImplTest {
 
     private static final Long COMMUNITY_ID = 10L;
@@ -61,7 +60,7 @@ class CommunityServiceImplTest {
     @Mock
     private MembershipService membershipService;
 
-    @InjectMocks
+    private CommunityPlanLimits planLimits;
     private CommunityServiceImpl communityService;
 
     private Player creator;
@@ -69,14 +68,24 @@ class CommunityServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(communityService, "maxCreatedFreemium", 1);
-        ReflectionTestUtils.setField(communityService, "maxCreatedBasic", 5);
-        ReflectionTestUtils.setField(communityService, "maxCreatedPro", 8);
-        ReflectionTestUtils.setField(communityService, "maxCreatedEnterprise", 8);
-        ReflectionTestUtils.setField(communityService, "maxTotalFreemium", 2);
-        ReflectionTestUtils.setField(communityService, "maxTotalBasic", 7);
-        ReflectionTestUtils.setField(communityService, "maxTotalPro", 10);
-        ReflectionTestUtils.setField(communityService, "maxTotalEnterprise", 10);
+        CommunityMapper communityMapper = new CommunityMapper(modelMapper);
+        CommunityAccessPolicy accessPolicy = new CommunityAccessPolicy(membershipRepository);
+        planLimits = new CommunityPlanLimits(communityRepository, membershipRepository, membershipService);
+        CommunityMemberService memberService = new CommunityMemberServiceImpl(
+                communityRepository, membershipRepository, playerRepository,
+                communityMapper, accessPolicy, planLimits);
+        communityService = new CommunityServiceImpl(
+                communityRepository, membershipRepository, playerRepository,
+                communityMapper, accessPolicy, planLimits, memberService);
+
+        ReflectionTestUtils.setField(planLimits, "maxCreatedFreemium", 1);
+        ReflectionTestUtils.setField(planLimits, "maxCreatedBasic", 5);
+        ReflectionTestUtils.setField(planLimits, "maxCreatedPro", 8);
+        ReflectionTestUtils.setField(planLimits, "maxCreatedEnterprise", 8);
+        ReflectionTestUtils.setField(planLimits, "maxTotalFreemium", 2);
+        ReflectionTestUtils.setField(planLimits, "maxTotalBasic", 7);
+        ReflectionTestUtils.setField(planLimits, "maxTotalPro", 10);
+        ReflectionTestUtils.setField(planLimits, "maxTotalEnterprise", 10);
 
         lenient().when(membershipService.getActivePlan(anyLong())).thenReturn(MembershipPlan.FREEMIUM);
 
