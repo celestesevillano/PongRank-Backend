@@ -83,8 +83,8 @@ public class AuthServiceImpl implements AuthService {
         if (player.getFederatedDeclared() == null) {
             player.setFederatedDeclared(false);
         }
-        if (dto.getInitialRating() != null) {
-            player.setRatingGlicko(dto.getInitialRating().doubleValue());
+        if (dto.getInitialLevel() != null) {
+            player.setRatingGlicko(dto.getInitialLevel().getRating());
         }
 
         Player savedPlayer = playerRepository.save(player);

@@ -108,13 +108,13 @@ class AuthServiceImplTest {
     }
 
     @Test
-    @DisplayName("shouldAssignInitialRatingWhenProvidedInRegisterRequest")
-    void shouldAssignInitialRatingWhenProvidedInRegisterRequest() {
+    @DisplayName("shouldAssignRatingOfInitialLevelWhenProvidedInRegisterRequest")
+    void shouldAssignRatingOfInitialLevelWhenProvidedInRegisterRequest() {
         PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
                 .name("Adriana")
                 .email("adriana@utec.edu.pe")
                 .password("Password123")
-                .initialRating(1850)
+                .initialLevel(org.example.pongrankbackend.Player.InitialLevel.ADVANCED)
                 .build();
 
         Player mappedPlayer = Player.builder().name("Adriana").email("adriana@utec.edu.pe").build();
@@ -132,12 +132,12 @@ class AuthServiceImplTest {
 
         org.mockito.ArgumentCaptor<Player> captor = org.mockito.ArgumentCaptor.forClass(Player.class);
         verify(playerRepository).save(captor.capture());
-        assertThat(captor.getValue().getRatingGlicko()).isEqualTo(1850.0);
+        assertThat(captor.getValue().getRatingGlicko()).isEqualTo(1800.0);
     }
 
     @Test
-    @DisplayName("shouldKeepDefaultRatingWhenInitialRatingIsNotProvided")
-    void shouldKeepDefaultRatingWhenInitialRatingIsNotProvided() {
+    @DisplayName("shouldKeepDefaultRatingWhenInitialLevelIsNotProvided")
+    void shouldKeepDefaultRatingWhenInitialLevelIsNotProvided() {
         PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
                 .name("Adriana")
                 .email("adriana@utec.edu.pe")

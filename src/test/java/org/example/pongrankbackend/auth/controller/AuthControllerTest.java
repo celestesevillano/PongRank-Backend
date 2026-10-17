@@ -135,22 +135,16 @@ class AuthControllerTest {
     }
 
     @Test
-    @DisplayName("400 Bad Request - initialRating fuera del rango 1-2800")
-    void register_InitialRatingOutOfRange_Returns400() throws Exception {
-        PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
-                .name("Adriana")
-                .email("adriana@utec.edu.pe")
-                .password("Password123")
-                .initialRating(2801)
-                .build();
+    @DisplayName("400 Bad Request - initialLevel que no existe")
+    void register_UnknownInitialLevel_Returns400() throws Exception {
+        String body = "{\"name\":\"Adriana\",\"email\":\"adriana@utec.edu.pe\",\"password\":\"Password123\",\"initialLevel\":\"GENIUS\"}";
 
         mockMvc.perform(post("/api/v1/auth/register")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                        .content(body))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status", is(400)))
-                .andExpect(jsonPath("$.message", containsString("initialRating")));
+                .andExpect(jsonPath("$.status", is(400)));
     }
 
     @Test
