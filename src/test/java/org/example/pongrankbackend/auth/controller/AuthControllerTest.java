@@ -135,6 +135,19 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("400 Bad Request - initialLevel que no existe")
+    void register_UnknownInitialLevel_Returns400() throws Exception {
+        String body = "{\"name\":\"Adriana\",\"email\":\"adriana@utec.edu.pe\",\"password\":\"Password123\",\"initialLevel\":\"GENIUS\"}";
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)));
+    }
+
+    @Test
     @DisplayName("409 Conflict - Email ya registrado lanza EmailAlreadyExistsException")
     void register_EmailAlreadyExists_Returns409() throws Exception {
         PlayerRegisterRequestDTO request = PlayerRegisterRequestDTO.builder()

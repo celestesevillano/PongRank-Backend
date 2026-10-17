@@ -108,6 +108,61 @@ class AuthServiceImplTest {
     }
 
     @Test
+    @DisplayName("shouldAssignRatingOfInitialLevelWhenProvidedInRegisterRequest")
+    void shouldAssignRatingOfInitialLevelWhenProvidedInRegisterRequest() {
+        PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .initialLevel(org.example.pongrankbackend.Player.InitialLevel.ADVANCED)
+                .build();
+
+        Player mappedPlayer = Player.builder().name("Adriana").email("adriana@utec.edu.pe").build();
+        Player savedPlayer = createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE);
+
+        when(playerRepository.existsByEmail("adriana@utec.edu.pe")).thenReturn(false);
+        when(modelMapper.map(dto, Player.class)).thenReturn(mappedPlayer);
+        when(passwordEncoder.encode("Password123")).thenReturn("encoded_secret_pass");
+        when(playerRepository.save(any(Player.class))).thenReturn(savedPlayer);
+        when(jwtService.generateAccessToken(any(CustomUserDetails.class))).thenReturn("access_token_xyz");
+        when(jwtService.generateRefreshToken(any(CustomUserDetails.class))).thenReturn("refresh_token_xyz");
+        when(modelMapper.map(savedPlayer, PlayerResponseDTO.class)).thenReturn(new PlayerResponseDTO());
+
+        authService.register(dto);
+
+        org.mockito.ArgumentCaptor<Player> captor = org.mockito.ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(captor.capture());
+        assertThat(captor.getValue().getRatingGlicko()).isEqualTo(1800.0);
+    }
+
+    @Test
+    @DisplayName("shouldKeepDefaultRatingWhenInitialLevelIsNotProvided")
+    void shouldKeepDefaultRatingWhenInitialLevelIsNotProvided() {
+        PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .build();
+
+        Player mappedPlayer = Player.builder().name("Adriana").email("adriana@utec.edu.pe").build();
+        Player savedPlayer = createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE);
+
+        when(playerRepository.existsByEmail("adriana@utec.edu.pe")).thenReturn(false);
+        when(modelMapper.map(dto, Player.class)).thenReturn(mappedPlayer);
+        when(passwordEncoder.encode("Password123")).thenReturn("encoded_secret_pass");
+        when(playerRepository.save(any(Player.class))).thenReturn(savedPlayer);
+        when(jwtService.generateAccessToken(any(CustomUserDetails.class))).thenReturn("access_token_xyz");
+        when(jwtService.generateRefreshToken(any(CustomUserDetails.class))).thenReturn("refresh_token_xyz");
+        when(modelMapper.map(savedPlayer, PlayerResponseDTO.class)).thenReturn(new PlayerResponseDTO());
+
+        authService.register(dto);
+
+        org.mockito.ArgumentCaptor<Player> captor = org.mockito.ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(captor.capture());
+        assertThat(captor.getValue().getRatingGlicko()).isEqualTo(1500.0);
+    }
+
+    @Test
     @DisplayName("shouldThrowEmailAlreadyExistsExceptionWhenEmailIsRegistered")
     void shouldThrowEmailAlreadyExistsExceptionWhenEmailIsRegistered() {
         // Arrange

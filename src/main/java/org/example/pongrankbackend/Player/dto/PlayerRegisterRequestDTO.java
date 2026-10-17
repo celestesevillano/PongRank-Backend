@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.pongrankbackend.Player.InitialLevel;
 
 @Data
 @NoArgsConstructor
@@ -40,4 +41,6 @@ public class PlayerRegisterRequestDTO {
 
     @Builder.Default
     private Boolean federatedDeclared = false;
+
+    private InitialLevel initialLevel;
 }
