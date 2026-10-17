@@ -135,6 +135,25 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("400 Bad Request - initialRating fuera del rango 1-2800")
+    void register_InitialRatingOutOfRange_Returns400() throws Exception {
+        PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .initialRating(2801)
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status", is(400)))
+                .andExpect(jsonPath("$.message", containsString("initialRating")));
+    }
+
+    @Test
     @DisplayName("409 Conflict - Email ya registrado lanza EmailAlreadyExistsException")
     void register_EmailAlreadyExists_Returns409() throws Exception {
         PlayerRegisterRequestDTO request = PlayerRegisterRequestDTO.builder()
