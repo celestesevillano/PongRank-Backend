@@ -9,6 +9,8 @@ public interface FriendshipService {
 
     FriendshipResponseDTO sendFriendRequest(Long senderId, FriendshipRequestDTO dto);
 
+    FriendshipResponseDTO sendFriendRequest(Long requestedSenderId, Long actingPlayerId, FriendshipRequestDTO dto);
+
     FriendshipResponseDTO acceptFriendRequest(Long friendshipId, Long actingPlayerId);
 
     FriendshipResponseDTO rejectFriendRequest(Long friendshipId, Long actingPlayerId);

@@ -7,6 +7,7 @@ import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
 import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.FriendshipRequestException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
@@ -24,13 +25,26 @@ public class FriendshipServiceImpl implements FriendshipService {
     private final FriendshipRepository friendshipRepository;
     private final PlayerRepository playerRepository;
     private final ModelMapper modelMapper;
+    private final PlayerAccessGuard playerAccessGuard;
 
     public FriendshipServiceImpl(FriendshipRepository friendshipRepository,
                                   PlayerRepository playerRepository,
-                                  ModelMapper modelMapper) {
+                                  ModelMapper modelMapper,
+                                  PlayerAccessGuard playerAccessGuard) {
         this.friendshipRepository = friendshipRepository;
         this.playerRepository = playerRepository;
         this.modelMapper = modelMapper;
+        this.playerAccessGuard = playerAccessGuard;
+    }
+
+    @Override
+    @Transactional
+    public FriendshipResponseDTO sendFriendRequest(Long requestedSenderId, Long actingPlayerId, FriendshipRequestDTO dto) {
+        if (requestedSenderId != null) {
+            playerAccessGuard.requireSelfOrAdmin(requestedSenderId,
+                    "No puedes enviar solicitudes de amistad en nombre de otro jugador");
+        }
+        return sendFriendRequest(actingPlayerId, dto);
     }
 
     @Override
@@ -150,6 +164,7 @@ public class FriendshipServiceImpl implements FriendshipService {
 
     @Override
     public List<FriendshipResponseDTO> getAcceptedFriends(Long playerId) {
+        playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes consultar tu propia lista de amigos");
         if (!playerRepository.existsById(playerId)) {
             throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }
@@ -162,6 +177,8 @@ public class FriendshipServiceImpl implements FriendshipService {
 
     @Override
     public List<FriendshipResponseDTO> getPendingRequests(Long playerId) {
+        playerAccessGuard.requireSelfOrAdmin(playerId,
+                "Solo puedes consultar tus propias solicitudes de amistad pendientes");
         if (!playerRepository.existsById(playerId)) {
             throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }

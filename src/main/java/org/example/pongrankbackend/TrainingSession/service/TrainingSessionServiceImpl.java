@@ -3,6 +3,7 @@ package org.example.pongrankbackend.TrainingSession.service;
 import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
@@ -25,15 +26,28 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
     private final PlayerRepository playerRepository;
     private final MembershipService membershipService;
     private final ModelMapper modelMapper;
+    private final PlayerAccessGuard playerAccessGuard;
 
     public TrainingSessionServiceImpl(TrainingSessionRepository trainingSessionRepository,
                                        PlayerRepository playerRepository,
                                        MembershipService membershipService,
-                                       ModelMapper modelMapper) {
+                                       ModelMapper modelMapper,
+                                       PlayerAccessGuard playerAccessGuard) {
         this.trainingSessionRepository = trainingSessionRepository;
         this.playerRepository = playerRepository;
         this.membershipService = membershipService;
         this.modelMapper = modelMapper;
+        this.playerAccessGuard = playerAccessGuard;
+    }
+
+    @Override
+    @Transactional
+    public TrainingSessionResponseDTO registerSession(Long requestedPlayerId, Long actingPlayerId, TrainingSessionCreateDTO dto) {
+        if (requestedPlayerId != null) {
+            playerAccessGuard.requireSelfOrAdmin(requestedPlayerId,
+                    "No puedes registrar sesiones de entrenamiento para otro jugador");
+        }
+        return registerSession(actingPlayerId, dto);
     }
 
     @Override
@@ -76,6 +90,7 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
 
     @Override
     public Page<TrainingSessionResponseDTO> getHistoryByPlayer(Long playerId, Pageable pageable) {
+        playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes consultar tu propio historial de entrenamiento");
         if (!playerRepository.existsById(playerId)) {
             throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }
@@ -86,6 +101,7 @@ public class TrainingSessionServiceImpl implements TrainingSessionService {
 
     @Override
     public TrainingSessionResponseDTO getBestSessionByPlayer(Long playerId) {
+        playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes consultar el récord de tu propio entrenamiento");
         if (!playerRepository.existsById(playerId)) {
             throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
         }

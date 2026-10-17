@@ -9,10 +9,7 @@ import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.service.PlayerService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
-import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -47,11 +44,7 @@ public class PlayerController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PlayerResponseDTO> updatePlayer(
             @PathVariable Long playerId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody PlayerUpdateRequestDTO dto) {
-        if (!currentUser.getId().equals(playerId) && !currentUser.getRole().equals("ROLE_SYSTEM_ADMIN")) {
-            throw new UnauthorizedActionException("Solo puedes actualizar la información de tu propio perfil");
-        }
         PlayerResponseDTO response = playerService.updatePlayer(playerId, dto);
         return ResponseEntity.ok(response);
     }

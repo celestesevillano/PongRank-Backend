@@ -14,12 +14,14 @@ import org.example.pongrankbackend.Membership.MembershipStatus;
 import org.example.pongrankbackend.Membership.PaymentStatus;
 import org.example.pongrankbackend.Membership.PaymentTransaction;
 import org.example.pongrankbackend.Membership.dto.CreatePreferenceResponseDTO;
+import org.example.pongrankbackend.Membership.dto.MercadoPagoWebhookPayloadDTO;
 import org.example.pongrankbackend.Membership.dto.PaymentStatusResponseDTO;
 import org.example.pongrankbackend.Membership.event.PaymentConfirmedEvent;
 import org.example.pongrankbackend.Membership.repository.PaymentTransactionRepository;
+import org.example.pongrankbackend.common.exception.InvalidWebhookSignatureException;
 import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
-import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +47,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final MembershipService membershipService;
     private final PaymentTransactionRepository paymentTransactionRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final PlayerAccessGuard playerAccessGuard;
 
     @Value("${mercadopago.webhook-url}")
     private String webhookUrl;
@@ -65,10 +68,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     public PaymentServiceImpl(MembershipService membershipService,
                                PaymentTransactionRepository paymentTransactionRepository,
-                               ApplicationEventPublisher eventPublisher) {
+                               ApplicationEventPublisher eventPublisher,
+                               PlayerAccessGuard playerAccessGuard) {
         this.membershipService = membershipService;
         this.paymentTransactionRepository = paymentTransactionRepository;
         this.eventPublisher = eventPublisher;
+        this.playerAccessGuard = playerAccessGuard;
     }
 
     @Override
@@ -127,6 +132,19 @@ public class PaymentServiceImpl implements PaymentService {
         } catch (MPApiException | MPException e) {
             throw new PaymentProcessingException("No se pudo crear la preferencia de pago en MercadoPago: " + e.getMessage());
         }
+    }
+
+    @Override
+    @Transactional
+    public void handleWebhook(MercadoPagoWebhookPayloadDTO payload, String xSignature, String xRequestId) {
+        if (!"payment".equals(payload.getType()) || payload.getData() == null) {
+            return;
+        }
+        String dataId = payload.getData().getId();
+        if (!isValidWebhookSignature(xSignature, xRequestId, dataId)) {
+            throw new InvalidWebhookSignatureException("Firma del webhook inválida");
+        }
+        processWebhookNotification(dataId);
     }
 
     @Override
@@ -237,14 +255,12 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     @Override
-    public PaymentStatusResponseDTO getPaymentStatus(Long transactionId, Long requestingPlayerId, boolean isSystemAdmin) {
+    public PaymentStatusResponseDTO getPaymentStatus(Long transactionId) {
         PaymentTransaction transaction = paymentTransactionRepository.findById(transactionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Transacción no encontrada con ID: " + transactionId));
 
         Long ownerId = transaction.getMembership().getPlayer().getId();
-        if (!isSystemAdmin && !ownerId.equals(requestingPlayerId)) {
-            throw new UnauthorizedActionException("Solo puedes consultar el estado de tus propias transacciones");
-        }
+        playerAccessGuard.requireSelfOrAdmin(ownerId, "Solo puedes consultar el estado de tus propias transacciones");
 
         return PaymentStatusResponseDTO.builder()
                 .transactionId(transaction.getId())

@@ -41,23 +41,15 @@ public class PaymentController {
             @RequestBody MercadoPagoWebhookPayloadDTO payload,
             @RequestHeader(value = "x-signature", required = false) String xSignature,
             @RequestHeader(value = "x-request-id", required = false) String xRequestId) {
-        if ("payment".equals(payload.getType()) && payload.getData() != null) {
-            String dataId = payload.getData().getId();
-            if (!paymentService.isValidWebhookSignature(xSignature, xRequestId, dataId)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-            }
-            paymentService.processWebhookNotification(dataId);
-        }
+        paymentService.handleWebhook(payload, xSignature, xRequestId);
         return ResponseEntity.ok().build();
     }
 
     @GetMapping("/status/{transactionId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PaymentStatusResponseDTO> getStatus(
-            @PathVariable Long transactionId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        PaymentStatusResponseDTO response = paymentService.getPaymentStatus(transactionId, currentUser.getId(), isSystemAdmin);
+            @PathVariable Long transactionId) {
+        PaymentStatusResponseDTO response = paymentService.getPaymentStatus(transactionId);
         return ResponseEntity.ok(response);
     }
 }

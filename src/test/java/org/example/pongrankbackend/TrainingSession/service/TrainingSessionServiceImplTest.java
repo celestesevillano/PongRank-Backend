@@ -13,6 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -25,6 +27,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
@@ -43,8 +47,47 @@ class TrainingSessionServiceImplTest {
     @Mock
     private ModelMapper modelMapper;
 
+    @Mock
+    private PlayerAccessGuard playerAccessGuard;
+
     @InjectMocks
     private TrainingSessionServiceImpl trainingSessionService;
+
+    @Test
+    @DisplayName("registerSession: con playerId en la ruta valida que sea el mismo jugador o un admin")
+    void registerSession_WithRequestedPlayer_AccessDenied_ThrowsException() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(5L), anyString());
+
+        assertThatThrownBy(() -> trainingSessionService.registerSession(5L, 2L, new TrainingSessionCreateDTO()))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verifyNoInteractions(trainingSessionRepository);
+    }
+
+    @Test
+    @DisplayName("getHistoryByPlayer paginado: lanza UnauthorizedActionException si el guard deniega el acceso")
+    void getHistoryByPlayerPaged_AccessDenied_ThrowsException() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(5L), anyString());
+
+        assertThatThrownBy(() -> trainingSessionService.getHistoryByPlayer(5L, org.springframework.data.domain.Pageable.unpaged()))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verifyNoInteractions(trainingSessionRepository);
+    }
+
+    @Test
+    @DisplayName("getBestSessionByPlayer: lanza UnauthorizedActionException si el guard deniega el acceso")
+    void getBestSessionByPlayer_AccessDenied_ThrowsException() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(5L), anyString());
+
+        assertThatThrownBy(() -> trainingSessionService.getBestSessionByPlayer(5L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verifyNoInteractions(trainingSessionRepository);
+    }
 
     @Test
     @DisplayName("registerSession: guarda la sesión asociada al jugador cuando el jugador existe")
