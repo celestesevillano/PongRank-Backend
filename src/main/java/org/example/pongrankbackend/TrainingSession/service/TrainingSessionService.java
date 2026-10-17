@@ -11,6 +11,8 @@ public interface TrainingSessionService {
 
     TrainingSessionResponseDTO registerSession(Long playerId, TrainingSessionCreateDTO dto);
 
+    TrainingSessionResponseDTO registerSession(Long requestedPlayerId, Long actingPlayerId, TrainingSessionCreateDTO dto);
+
     List<TrainingSessionResponseDTO> getHistoryByPlayer(Long playerId);
 
     Page<TrainingSessionResponseDTO> getHistoryByPlayer(Long playerId, Pageable pageable);

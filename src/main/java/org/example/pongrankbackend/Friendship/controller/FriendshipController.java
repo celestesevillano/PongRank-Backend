@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import org.example.pongrankbackend.Friendship.dto.FriendshipRequestDTO;
 import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
 import org.example.pongrankbackend.Friendship.service.FriendshipService;
-import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -30,12 +29,7 @@ public class FriendshipController {
             @PathVariable(required = false) Long senderId,
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody FriendshipRequestDTO dto) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        if (senderId != null && !currentUser.getId().equals(senderId) && !isSystemAdmin) {
-            throw new UnauthorizedActionException(
-                    "No puedes enviar solicitudes de amistad en nombre de otro jugador");
-        }
-        FriendshipResponseDTO response = friendshipService.sendFriendRequest(currentUser.getId(), dto);
+        FriendshipResponseDTO response = friendshipService.sendFriendRequest(senderId, currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -78,13 +72,7 @@ public class FriendshipController {
     @GetMapping("/players/{playerId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<FriendshipResponseDTO>> getAcceptedFriends(
-            @PathVariable Long playerId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        if (!currentUser.getId().equals(playerId) && !isSystemAdmin) {
-            throw new UnauthorizedActionException(
-                    "Solo puedes consultar tu propia lista de amigos");
-        }
+            @PathVariable Long playerId) {
         List<FriendshipResponseDTO> response = friendshipService.getAcceptedFriends(playerId);
         return ResponseEntity.ok(response);
     }
@@ -92,13 +80,7 @@ public class FriendshipController {
     @GetMapping("/players/{playerId}/pending")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<FriendshipResponseDTO>> getPendingRequests(
-            @PathVariable Long playerId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        if (!currentUser.getId().equals(playerId) && !isSystemAdmin) {
-            throw new UnauthorizedActionException(
-                    "Solo puedes consultar tus propias solicitudes de amistad pendientes");
-        }
+            @PathVariable Long playerId) {
         List<FriendshipResponseDTO> response = friendshipService.getPendingRequests(playerId);
         return ResponseEntity.ok(response);
     }

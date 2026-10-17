@@ -25,6 +25,7 @@ import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.example.pongrankbackend.security.SecurityUtils;
 import org.modelmapper.ModelMapper;
 import org.springframework.context.ApplicationEventPublisher;
@@ -48,6 +49,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final ApplicationEventPublisher eventPublisher;
     private final ModelMapper modelMapper;
     private final AuthService authService;
+    private final PlayerAccessGuard playerAccessGuard;
 
     public PlayerServiceImpl(PlayerRepository playerRepository,
                              ClubRepository clubRepository,
@@ -57,7 +59,8 @@ public class PlayerServiceImpl implements PlayerService {
                              PasswordEncoder passwordEncoder,
                              ApplicationEventPublisher eventPublisher,
                              ModelMapper modelMapper,
-                             AuthService authService) {
+                             AuthService authService,
+                             PlayerAccessGuard playerAccessGuard) {
         this.playerRepository = playerRepository;
         this.clubRepository = clubRepository;
         this.clubMembershipRepository = clubMembershipRepository;
@@ -67,6 +70,7 @@ public class PlayerServiceImpl implements PlayerService {
         this.eventPublisher = eventPublisher;
         this.modelMapper = modelMapper;
         this.authService = authService;
+        this.playerAccessGuard = playerAccessGuard;
     }
 
     @Override
@@ -101,6 +105,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Override
     @Transactional
     public PlayerResponseDTO updatePlayer(Long playerId, PlayerUpdateRequestDTO dto) {
+        playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes actualizar la información de tu propio perfil");
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
 

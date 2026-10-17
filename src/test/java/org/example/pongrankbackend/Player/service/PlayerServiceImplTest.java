@@ -29,6 +29,7 @@ import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
 import org.example.pongrankbackend.security.CustomUserDetails;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,6 +83,9 @@ class PlayerServiceImplTest {
 
     @Mock
     private AuthService authService;
+
+    @Mock
+    private PlayerAccessGuard playerAccessGuard;
 
     @InjectMocks
     private PlayerServiceImpl playerService;
@@ -209,6 +213,18 @@ class PlayerServiceImplTest {
         assertThat(result.getId()).isEqualTo(playerId);
         assertThat(result.getName()).isEqualTo("Carlos Gomez");
         verify(playerRepository).findById(playerId);
+    }
+
+    @Test
+    @DisplayName("updatePlayer: lanza UnauthorizedActionException si el guard deniega el acceso")
+    void updatePlayer_AccessDenied_ThrowsException() {
+        org.mockito.Mockito.doThrow(new org.example.pongrankbackend.common.exception.UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(org.mockito.ArgumentMatchers.eq(5L), org.mockito.ArgumentMatchers.anyString());
+
+        assertThatThrownBy(() -> playerService.updatePlayer(5L, new PlayerUpdateRequestDTO()))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.UnauthorizedActionException.class);
+
+        verifyNoInteractions(playerRepository);
     }
 
     @Test

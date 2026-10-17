@@ -18,7 +18,10 @@ import org.example.pongrankbackend.Membership.repository.PaymentTransactionRepos
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.common.exception.PaymentProcessingException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.Membership.dto.MercadoPagoWebhookPayloadDTO;
+import org.example.pongrankbackend.common.exception.InvalidWebhookSignatureException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.example.pongrankbackend.Membership.event.PaymentConfirmedEvent;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,6 +41,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -54,6 +59,9 @@ class PaymentServiceImplTest {
 
     @Mock
     private org.springframework.context.ApplicationEventPublisher eventPublisher;
+
+    @Mock
+    private PlayerAccessGuard playerAccessGuard;
 
     @InjectMocks
     private PaymentServiceImpl paymentService;
@@ -272,6 +280,43 @@ class PaymentServiceImplTest {
         }
     }
 
+    // ----- handleWebhook -----
+
+    @Test
+    @DisplayName("handleWebhook: ignora notificaciones que no son de tipo payment")
+    void handleWebhook_NonPaymentType_IsIgnored() {
+        MercadoPagoWebhookPayloadDTO payload = MercadoPagoWebhookPayloadDTO.builder().type("merchant_order").build();
+
+        paymentService.handleWebhook(payload, null, null);
+
+        verifyNoInteractions(paymentTransactionRepository);
+    }
+
+    @Test
+    @DisplayName("handleWebhook: payment sin data se ignora")
+    void handleWebhook_PaymentWithoutData_IsIgnored() {
+        MercadoPagoWebhookPayloadDTO payload = MercadoPagoWebhookPayloadDTO.builder().type("payment").build();
+
+        paymentService.handleWebhook(payload, null, null);
+
+        verifyNoInteractions(paymentTransactionRepository);
+    }
+
+    @Test
+    @DisplayName("handleWebhook: firma inválida lanza InvalidWebhookSignatureException y no procesa el pago")
+    void handleWebhook_InvalidSignature_ThrowsAndDoesNotProcess() {
+        ReflectionTestUtils.setField(paymentService, "webhookSecret", "mi-secreto");
+        MercadoPagoWebhookPayloadDTO payload = MercadoPagoWebhookPayloadDTO.builder()
+                .type("payment")
+                .data(MercadoPagoWebhookPayloadDTO.DataDTO.builder().id("999").build())
+                .build();
+
+        assertThatThrownBy(() -> paymentService.handleWebhook(payload, "ts=1,v1=firma-falsa", "req-1"))
+                .isInstanceOf(InvalidWebhookSignatureException.class);
+
+        verifyNoInteractions(paymentTransactionRepository);
+    }
+
     // ----- isValidWebhookSignature -----
 
     @Test
@@ -368,8 +413,9 @@ class PaymentServiceImplTest {
         PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).amount(PRO_PRICE).build();
         when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
 
-        PaymentStatusResponseDTO response = paymentService.getPaymentStatus(42L, 1L, false);
+        PaymentStatusResponseDTO response = paymentService.getPaymentStatus(42L);
 
+        verify(playerAccessGuard).requireSelfOrAdmin(eq(1L), anyString());
         assertThat(response.getTransactionId()).isEqualTo(42L);
         assertThat(response.getStatus()).isEqualTo(PaymentStatus.APPROVED);
         assertThat(response.getMembershipStatus()).isEqualTo(MembershipStatus.ACTIVE);
@@ -383,7 +429,7 @@ class PaymentServiceImplTest {
         PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).amount(PRO_PRICE).build();
         when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
 
-        PaymentStatusResponseDTO response = paymentService.getPaymentStatus(42L, 999L, true);
+        PaymentStatusResponseDTO response = paymentService.getPaymentStatus(42L);
 
         assertThat(response.getTransactionId()).isEqualTo(42L);
     }
@@ -396,7 +442,10 @@ class PaymentServiceImplTest {
         PaymentTransaction transaction = PaymentTransaction.builder().id(42L).membership(membership).status(PaymentStatus.APPROVED).build();
         when(paymentTransactionRepository.findById(42L)).thenReturn(Optional.of(transaction));
 
-        assertThatThrownBy(() -> paymentService.getPaymentStatus(42L, 2L, false))
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(1L), anyString());
+
+        assertThatThrownBy(() -> paymentService.getPaymentStatus(42L))
                 .isInstanceOf(UnauthorizedActionException.class);
     }
 
@@ -405,7 +454,7 @@ class PaymentServiceImplTest {
     void getPaymentStatus_TransactionNotFound_ThrowsException() {
         when(paymentTransactionRepository.findById(999L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> paymentService.getPaymentStatus(999L, 1L, false))
+        assertThatThrownBy(() -> paymentService.getPaymentStatus(999L))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 }

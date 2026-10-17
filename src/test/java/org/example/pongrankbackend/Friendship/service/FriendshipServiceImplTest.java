@@ -16,6 +16,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,6 +28,8 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -41,8 +44,59 @@ class FriendshipServiceImplTest {
     @Mock
     private ModelMapper modelMapper;
 
+    @Mock
+    private PlayerAccessGuard playerAccessGuard;
+
     @InjectMocks
     private FriendshipServiceImpl friendshipService;
+
+    @Test
+    @DisplayName("sendFriendRequest: con senderId en la ruta valida que sea el mismo jugador o un admin")
+    void sendFriendRequest_WithRequestedSender_ChecksAccessAndDelegates() {
+        FriendshipRequestDTO dto = FriendshipRequestDTO.builder().receiverId(1L).build();
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(5L), anyString());
+
+        assertThatThrownBy(() -> friendshipService.sendFriendRequest(5L, 2L, dto))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verify(playerRepository, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("sendFriendRequest: sin senderId en la ruta no consulta el guard")
+    void sendFriendRequest_WithoutRequestedSender_SkipsAccessCheck() {
+        FriendshipRequestDTO dto = FriendshipRequestDTO.builder().receiverId(2L).build();
+
+        assertThatThrownBy(() -> friendshipService.sendFriendRequest(null, 2L, dto))
+                .isInstanceOf(FriendshipRequestException.class);
+
+        verifyNoInteractions(playerAccessGuard);
+    }
+
+    @Test
+    @DisplayName("getAcceptedFriends: lanza UnauthorizedActionException si el guard deniega el acceso")
+    void getAcceptedFriends_AccessDenied_ThrowsException() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(7L), anyString());
+
+        assertThatThrownBy(() -> friendshipService.getAcceptedFriends(7L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verifyNoInteractions(friendshipRepository);
+    }
+
+    @Test
+    @DisplayName("getPendingRequests: lanza UnauthorizedActionException si el guard deniega el acceso")
+    void getPendingRequests_AccessDenied_ThrowsException() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(7L), anyString());
+
+        assertThatThrownBy(() -> friendshipService.getPendingRequests(7L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verifyNoInteractions(friendshipRepository);
+    }
 
     @Test
     @DisplayName("sendFriendRequest: no permite enviarse solicitud a sí mismo")

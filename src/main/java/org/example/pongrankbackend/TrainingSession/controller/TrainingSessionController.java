@@ -4,7 +4,6 @@ import jakarta.validation.Valid;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionCreateDTO;
 import org.example.pongrankbackend.TrainingSession.dto.TrainingSessionResponseDTO;
 import org.example.pongrankbackend.TrainingSession.service.TrainingSessionService;
-import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.security.CustomUserDetails;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,12 +31,7 @@ public class TrainingSessionController {
             @PathVariable(required = false) Long playerId,
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody TrainingSessionCreateDTO dto) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        if (playerId != null && !currentUser.getId().equals(playerId) && !isSystemAdmin) {
-            throw new UnauthorizedActionException(
-                    "No puedes registrar sesiones de entrenamiento para otro jugador");
-        }
-        TrainingSessionResponseDTO response = trainingSessionService.registerSession(currentUser.getId(), dto);
+        TrainingSessionResponseDTO response = trainingSessionService.registerSession(playerId, currentUser.getId(), dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -47,13 +41,7 @@ public class TrainingSessionController {
     @GetMapping("/players/{playerId}")
     public ResponseEntity<Page<TrainingSessionResponseDTO>> history(
             @PathVariable Long playerId,
-            @AuthenticationPrincipal CustomUserDetails currentUser,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        if (!currentUser.getId().equals(playerId) && !isSystemAdmin) {
-            throw new UnauthorizedActionException(
-                    "Solo puedes consultar tu propio historial de entrenamiento");
-        }
         Page<TrainingSessionResponseDTO> response = trainingSessionService.getHistoryByPlayer(playerId, pageable);
         return ResponseEntity.ok(response);
     }
@@ -63,13 +51,7 @@ public class TrainingSessionController {
      */
     @GetMapping("/players/{playerId}/best")
     public ResponseEntity<TrainingSessionResponseDTO> getBestSession(
-            @PathVariable Long playerId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        boolean isSystemAdmin = currentUser.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_SYSTEM_ADMIN"));
-        if (!currentUser.getId().equals(playerId) && !isSystemAdmin) {
-            throw new UnauthorizedActionException(
-                    "Solo puedes consultar el récord de tu propio entrenamiento");
-        }
+            @PathVariable Long playerId) {
         TrainingSessionResponseDTO response = trainingSessionService.getBestSessionByPlayer(playerId);
         return ResponseEntity.ok(response);
     }
