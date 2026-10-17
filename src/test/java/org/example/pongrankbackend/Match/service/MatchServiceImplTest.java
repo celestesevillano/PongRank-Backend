@@ -23,11 +23,11 @@ import org.example.pongrankbackend.Tournament.Tournament;
 import org.example.pongrankbackend.common.exception.InvalidMatchStateException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.modelmapper.ModelMapper;
@@ -77,8 +77,19 @@ class MatchServiceImplTest {
     @Mock
     private EntityManager entityManager;
 
-    @InjectMocks
     private MatchServiceImpl matchService;
+
+    @BeforeEach
+    void setUp() {
+        MatchMapper matchMapper = new MatchMapper(modelMapper);
+        OpenMatchService openMatchService = new OpenMatchServiceImpl(
+                matchRepository, playerRepository, matchRuleValidator, webSocketNotifier, matchMapper);
+        MatchResultService matchResultService = new MatchResultServiceImpl(
+                matchRepository, playerRepository, matchRuleValidator, webSocketNotifier, eventPublisher, matchMapper);
+        matchService = new MatchServiceImpl(
+                matchRepository, playerRepository, friendshipRepository, matchRuleValidator,
+                webSocketNotifier, matchMapper, entityManager, openMatchService, matchResultService);
+    }
 
     private Player createPlayer(Long id, String name) {
         return Player.builder()
