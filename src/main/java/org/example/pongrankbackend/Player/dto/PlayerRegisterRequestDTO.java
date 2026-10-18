@@ -2,8 +2,11 @@ package org.example.pongrankbackend.Player.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -43,4 +46,11 @@ public class PlayerRegisterRequestDTO {
     private Boolean federatedDeclared = false;
 
     private InitialLevel initialLevel;
+
+    @Pattern(regexp = "^[a-zA-Z0-9._]{3,30}$",
+            message = "El nombre de usuario debe tener entre 3 y 30 caracteres: letras, números, punto o guion bajo")
+    private String username;
+
+    @Past(message = "La fecha de nacimiento debe ser anterior a hoy")
+    private LocalDate birthDate;
 }

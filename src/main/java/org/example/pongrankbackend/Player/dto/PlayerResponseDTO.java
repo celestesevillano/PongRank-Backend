@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import org.example.pongrankbackend.Player.PlayerStatus;
 import org.example.pongrankbackend.Player.Role;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -17,7 +18,9 @@ public class PlayerResponseDTO {
 
     private Long id;
     private String name;
+    private String username;
     private String email;
+    private LocalDate birthDate;
     private String whatsapp;
     private Boolean shareContact;
     private String categoryFdptm;

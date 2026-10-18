@@ -148,6 +148,42 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("400 Bad Request - username con caracteres no permitidos")
+    void register_InvalidUsername_Returns400() throws Exception {
+        PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .username("ab")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("username")));
+    }
+
+    @Test
+    @DisplayName("400 Bad Request - fecha de nacimiento en el futuro")
+    void register_FutureBirthDate_Returns400() throws Exception {
+        PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .birthDate(java.time.LocalDate.now().plusDays(1))
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("birthDate")));
+    }
+
+    @Test
     @DisplayName("409 Conflict - Email ya registrado lanza EmailAlreadyExistsException")
     void register_EmailAlreadyExists_Returns409() throws Exception {
         PlayerRegisterRequestDTO request = PlayerRegisterRequestDTO.builder()

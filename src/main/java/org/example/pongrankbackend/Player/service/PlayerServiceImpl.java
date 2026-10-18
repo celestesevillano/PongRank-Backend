@@ -11,9 +11,11 @@ import org.example.pongrankbackend.CommunityMembership.MembershipStatus;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
 import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
+import org.example.pongrankbackend.Player.InitialLevel;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.PlayerStatus;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
+import org.example.pongrankbackend.Player.dto.InitialLevelResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
@@ -34,7 +36,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -92,6 +96,9 @@ public class PlayerServiceImpl implements PlayerService {
             response.setEmail(null);
             response.setWhatsapp(null);
         }
+        if (!isOwnerOrAdmin) {
+            response.setBirthDate(null);
+        }
         return response;
     }
 
@@ -103,11 +110,26 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    public List<InitialLevelResponseDTO> getInitialLevels() {
+        return Arrays.stream(InitialLevel.values())
+                .map(level -> new InitialLevelResponseDTO(level, level.getLabel()))
+                .toList();
+    }
+
+    @Override
     @Transactional
     public PlayerResponseDTO updatePlayer(Long playerId, PlayerUpdateRequestDTO dto) {
         playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes actualizar la información de tu propio perfil");
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
+
+        if (dto.getUsername() != null) {
+            String normalizedUsername = dto.getUsername().toLowerCase(Locale.ROOT);
+            if (playerRepository.existsByUsernameAndIdNot(normalizedUsername, playerId)) {
+                throw new ConflictException("El nombre de usuario '" + normalizedUsername + "' ya está en uso");
+            }
+            dto.setUsername(normalizedUsername);
+        }
 
         modelMapper.map(dto, player);
 

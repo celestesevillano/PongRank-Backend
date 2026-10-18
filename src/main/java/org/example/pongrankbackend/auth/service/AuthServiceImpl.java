@@ -15,6 +15,7 @@ import org.example.pongrankbackend.auth.dto.ResetPasswordRequestDTO;
 import org.example.pongrankbackend.auth.event.PasswordResetRequestedEvent;
 import org.example.pongrankbackend.auth.event.PlayerRegisteredEvent;
 import org.example.pongrankbackend.auth.repository.PasswordResetTokenRepository;
+import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.EmailAlreadyExistsException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
@@ -30,6 +31,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -71,8 +73,14 @@ public class AuthServiceImpl implements AuthService {
             throw new EmailAlreadyExistsException("El email '" + normalizedEmail + "' ya se encuentra registrado");
         }
 
+        String normalizedUsername = dto.getUsername() == null ? null : dto.getUsername().toLowerCase(Locale.ROOT);
+        if (normalizedUsername != null && playerRepository.existsByUsername(normalizedUsername)) {
+            throw new ConflictException("El nombre de usuario '" + normalizedUsername + "' ya está en uso");
+        }
+
         Player player = modelMapper.map(dto, Player.class);
         player.setEmail(normalizedEmail);
+        player.setUsername(normalizedUsername);
         player.setPassword(passwordEncoder.encode(dto.getPassword()));
         player.setRole(Role.ROLE_USER);
         player.setStatus(PlayerStatus.ACTIVE);
