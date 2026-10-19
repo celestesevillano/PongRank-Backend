@@ -28,7 +28,10 @@ class AgeCategorySuggesterTest {
             "1980-09-09, MALE,   Varones 40 años",
             "1950-01-01, FEMALE, Damas 60 años",
             "1940-01-01, MALE,   Varones 80 años",
-            "1920-01-01, MALE,   Varones 80 años"
+            "1920-01-01, MALE,   Varones 80 años",
+            "2014-06-01, PREFER_NOT_TO_SAY, Damas o Varones 13 años",
+            "2005-02-02, PREFER_NOT_TO_SAY, Todo competidor",
+            "1960-01-01, PREFER_NOT_TO_SAY, Damas o Varones 60 años"
     })
     void suggest_picksCategoryByAge(LocalDate birthDate, Gender gender, String expected) {
         assertThat(suggester.suggest(birthDate, gender, today)).isEqualTo(expected);

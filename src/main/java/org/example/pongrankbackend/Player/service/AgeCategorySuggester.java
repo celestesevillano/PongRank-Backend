@@ -32,9 +32,9 @@ public class AgeCategorySuggester {
             }
         }
         if (age < FIRST_VETERAN_AGE) {
-            return prefix + " todo competidor";
+            return gender == Gender.PREFER_NOT_TO_SAY ? "Todo competidor" : prefix + " todo competidor";
         }
-        int maxBand = gender == Gender.MALE ? MAX_VETERAN_BAND_MEN : MAX_VETERAN_BAND_WOMEN;
+        int maxBand = gender == Gender.FEMALE ? MAX_VETERAN_BAND_WOMEN : MAX_VETERAN_BAND_MEN;
         int band = Math.min((age / 10) * 10, maxBand);
         return prefix + " " + band + " años";
     }

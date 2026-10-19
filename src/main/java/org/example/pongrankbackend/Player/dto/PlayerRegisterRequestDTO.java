@@ -2,6 +2,7 @@ package org.example.pongrankbackend.Player.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -55,5 +56,6 @@ public class PlayerRegisterRequestDTO {
     @Past(message = "La fecha de nacimiento debe ser anterior a hoy")
     private LocalDate birthDate;
 
+    @NotNull(message = "El sexo es obligatorio (FEMALE, MALE o PREFER_NOT_TO_SAY)")
     private Gender gender;
 }

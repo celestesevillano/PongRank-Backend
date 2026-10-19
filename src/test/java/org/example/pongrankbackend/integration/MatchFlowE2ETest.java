@@ -58,6 +58,7 @@ class MatchFlowE2ETest {
         // PASO 1: Registro de Juan (Jugador 1)
         // =========================================================================
         PlayerRegisterRequestDTO juanRegister = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
                 .name("Juan Perez")
                 .email("juan.journey@pongrank.com")
                 .password("Password123")
@@ -83,6 +84,7 @@ class MatchFlowE2ETest {
         // PASO 2: Registro de Pedro (Jugador 2)
         // =========================================================================
         PlayerRegisterRequestDTO pedroRegister = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
                 .name("Pedro Gomez")
                 .email("pedro.journey@pongrank.com")
                 .password("Password123")
