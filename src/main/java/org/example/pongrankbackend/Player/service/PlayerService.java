@@ -1,5 +1,7 @@
 package org.example.pongrankbackend.Player.service;
 
+import org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionResponseDTO;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
 import org.example.pongrankbackend.Player.dto.InitialLevelResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
@@ -23,4 +25,6 @@ public interface PlayerService {
     void deleteAccount(DeleteAccountRequestDTO dto);
 
     List<InitialLevelResponseDTO> getInitialLevels();
+
+    CategorySuggestionResponseDTO suggestCategory(CategorySuggestionRequestDTO dto);
 }

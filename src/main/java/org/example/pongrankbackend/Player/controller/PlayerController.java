@@ -1,6 +1,8 @@
 package org.example.pongrankbackend.Player.controller;
 
 import jakarta.validation.Valid;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionResponseDTO;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
 import org.example.pongrankbackend.Player.dto.InitialLevelResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
@@ -34,6 +36,12 @@ public class PlayerController {
     @GetMapping("/initial-levels")
     public ResponseEntity<List<InitialLevelResponseDTO>> getInitialLevels() {
         return ResponseEntity.ok(playerService.getInitialLevels());
+    }
+
+    @PostMapping("/category-suggestion")
+    public ResponseEntity<CategorySuggestionResponseDTO> suggestCategory(
+            @Valid @RequestBody CategorySuggestionRequestDTO dto) {
+        return ResponseEntity.ok(playerService.suggestCategory(dto));
     }
 
     @GetMapping("/{playerId}")

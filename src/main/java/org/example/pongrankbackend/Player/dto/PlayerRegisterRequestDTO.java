@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.pongrankbackend.Player.Gender;
 import org.example.pongrankbackend.Player.InitialLevel;
 
 @Data
@@ -53,4 +54,6 @@ public class PlayerRegisterRequestDTO {
 
     @Past(message = "La fecha de nacimiento debe ser anterior a hoy")
     private LocalDate birthDate;
+
+    private Gender gender;
 }

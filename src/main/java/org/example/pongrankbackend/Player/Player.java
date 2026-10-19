@@ -46,6 +46,10 @@ public class Player {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private Gender gender;
+
     @NotBlank
     @Email
     @Size(max = 150)

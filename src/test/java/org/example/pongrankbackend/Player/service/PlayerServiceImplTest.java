@@ -87,6 +87,9 @@ class PlayerServiceImplTest {
     @Mock
     private PlayerAccessGuard playerAccessGuard;
 
+    @org.mockito.Spy
+    private AgeCategorySuggester ageCategorySuggester = new AgeCategorySuggester();
+
     @InjectMocks
     private PlayerServiceImpl playerService;
 
@@ -246,6 +249,21 @@ class PlayerServiceImplTest {
 
         assertThat(updateDto.getUsername()).isEqualTo("carlos.tt");
         verify(modelMapper).map(updateDto, existingPlayer);
+    }
+
+    @Test
+    @DisplayName("suggestCategory: devuelve la categoría sugerida por edad y sexo con su nota")
+    void suggestCategory_ReturnsSuggestionWithNote() {
+        var dto = org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO.builder()
+                .birthDate(java.time.LocalDate.now().minusYears(12))
+                .gender(org.example.pongrankbackend.Player.Gender.MALE)
+                .build();
+
+        var result = playerService.suggestCategory(dto);
+
+        assertThat(result.getAge()).isEqualTo(12);
+        assertThat(result.getCategory()).isEqualTo("Varones 13 años");
+        assertThat(result.getNote()).contains("no está verificada");
     }
 
     @Test
