@@ -97,6 +97,8 @@ public class SecurityConfig {
                     "/api/v1/auth/forgot-password",
                     "/api/v1/auth/reset-password",
                     "/api/v1/players/register",
+                    "/api/v1/players/initial-levels",
+                    "/api/v1/players/category-suggestion",
                     "/api/v1/payments/webhook",
                     "/images/**",
                     "/ws/**",

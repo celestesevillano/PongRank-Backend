@@ -136,6 +136,55 @@ class AuthServiceImplTest {
     }
 
     @Test
+    @DisplayName("shouldStoreUsernameInLowerCaseWhenProvidedInRegisterRequest")
+    void shouldStoreUsernameInLowerCaseWhenProvidedInRegisterRequest() {
+        PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .username("Adriana.TT")
+                .birthDate(java.time.LocalDate.of(2000, 3, 10))
+                .build();
+
+        Player mappedPlayer = Player.builder().name("Adriana").email("adriana@utec.edu.pe").build();
+        Player savedPlayer = createPlayer(1L, "adriana@utec.edu.pe", PlayerStatus.ACTIVE);
+
+        when(playerRepository.existsByEmail("adriana@utec.edu.pe")).thenReturn(false);
+        when(playerRepository.existsByUsername("adriana.tt")).thenReturn(false);
+        when(modelMapper.map(dto, Player.class)).thenReturn(mappedPlayer);
+        when(passwordEncoder.encode("Password123")).thenReturn("encoded_secret_pass");
+        when(playerRepository.save(any(Player.class))).thenReturn(savedPlayer);
+        when(jwtService.generateAccessToken(any(CustomUserDetails.class))).thenReturn("access_token_xyz");
+        when(jwtService.generateRefreshToken(any(CustomUserDetails.class))).thenReturn("refresh_token_xyz");
+        when(modelMapper.map(savedPlayer, PlayerResponseDTO.class)).thenReturn(new PlayerResponseDTO());
+
+        authService.register(dto);
+
+        org.mockito.ArgumentCaptor<Player> captor = org.mockito.ArgumentCaptor.forClass(Player.class);
+        verify(playerRepository).save(captor.capture());
+        assertThat(captor.getValue().getUsername()).isEqualTo("adriana.tt");
+    }
+
+    @Test
+    @DisplayName("shouldThrowConflictWhenUsernameIsAlreadyTaken")
+    void shouldThrowConflictWhenUsernameIsAlreadyTaken() {
+        PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .username("Adriana.TT")
+                .build();
+
+        when(playerRepository.existsByEmail("adriana@utec.edu.pe")).thenReturn(false);
+        when(playerRepository.existsByUsername("adriana.tt")).thenReturn(true);
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> authService.register(dto))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.ConflictException.class);
+
+        verify(playerRepository, org.mockito.Mockito.never()).save(any(Player.class));
+    }
+
+    @Test
     @DisplayName("shouldKeepDefaultRatingWhenInitialLevelIsNotProvided")
     void shouldKeepDefaultRatingWhenInitialLevelIsNotProvided() {
         PlayerRegisterRequestDTO dto = PlayerRegisterRequestDTO.builder()

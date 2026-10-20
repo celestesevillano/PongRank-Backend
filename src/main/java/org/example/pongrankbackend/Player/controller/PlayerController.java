@@ -1,7 +1,10 @@
 package org.example.pongrankbackend.Player.controller;
 
 import jakarta.validation.Valid;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionResponseDTO;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
+import org.example.pongrankbackend.Player.dto.InitialLevelResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
@@ -11,6 +14,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/players")
@@ -26,6 +31,17 @@ public class PlayerController {
     public ResponseEntity<PlayerResponseDTO> registerPlayer(@Valid @RequestBody PlayerRegisterRequestDTO dto) {
         PlayerResponseDTO response = playerService.registerPlayer(dto);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @GetMapping("/initial-levels")
+    public ResponseEntity<List<InitialLevelResponseDTO>> getInitialLevels() {
+        return ResponseEntity.ok(playerService.getInitialLevels());
+    }
+
+    @PostMapping("/category-suggestion")
+    public ResponseEntity<CategorySuggestionResponseDTO> suggestCategory(
+            @Valid @RequestBody CategorySuggestionRequestDTO dto) {
+        return ResponseEntity.ok(playerService.suggestCategory(dto));
     }
 
     @GetMapping("/{playerId}")

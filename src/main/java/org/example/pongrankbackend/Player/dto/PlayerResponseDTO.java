@@ -4,9 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.pongrankbackend.Player.Gender;
 import org.example.pongrankbackend.Player.PlayerStatus;
 import org.example.pongrankbackend.Player.Role;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -17,7 +19,10 @@ public class PlayerResponseDTO {
 
     private Long id;
     private String name;
+    private String username;
     private String email;
+    private LocalDate birthDate;
+    private Gender gender;
     private String whatsapp;
     private Boolean shareContact;
     private String categoryFdptm;

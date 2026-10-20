@@ -75,9 +75,25 @@ class AuthControllerTest {
     // ==========================================
 
     @Test
+    @DisplayName("400 Bad Request - Registro sin sexo es rechazado")
+    void register_MissingGender_Returns400() throws Exception {
+        PlayerRegisterRequestDTO request = PlayerRegisterRequestDTO.builder()
+                .name("Carlos Gomez")
+                .email("carlos@pongrank.com")
+                .password("Password123")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     @DisplayName("201 Created - Registro exitoso devuelve AuthResponseDTO")
     void register_Success_Returns201() throws Exception {
         PlayerRegisterRequestDTO request = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
                 .name("Carlos Gomez")
                 .email("carlos@pongrank.com")
                 .password("Password123")
@@ -118,6 +134,7 @@ class AuthControllerTest {
     @DisplayName("400 Bad Request - Validación Jakarta falla por email inválido y campos en blanco")
     void register_ValidationError_Returns400() throws Exception {
         PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
                 .name("")
                 .email("correo-invalido")
                 .password("123") // Menos de 8 caracteres
@@ -148,9 +165,48 @@ class AuthControllerTest {
     }
 
     @Test
+    @DisplayName("400 Bad Request - username con caracteres no permitidos")
+    void register_InvalidUsername_Returns400() throws Exception {
+        PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .username("ab")
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("username")));
+    }
+
+    @Test
+    @DisplayName("400 Bad Request - fecha de nacimiento en el futuro")
+    void register_FutureBirthDate_Returns400() throws Exception {
+        PlayerRegisterRequestDTO invalidRequest = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
+                .name("Adriana")
+                .email("adriana@utec.edu.pe")
+                .password("Password123")
+                .birthDate(java.time.LocalDate.now().plusDays(1))
+                .build();
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(invalidRequest)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("birthDate")));
+    }
+
+    @Test
     @DisplayName("409 Conflict - Email ya registrado lanza EmailAlreadyExistsException")
     void register_EmailAlreadyExists_Returns409() throws Exception {
         PlayerRegisterRequestDTO request = PlayerRegisterRequestDTO.builder()
+                .gender(org.example.pongrankbackend.Player.Gender.PREFER_NOT_TO_SAY)
                 .name("Carlos Gomez")
                 .email("duplicado@pongrank.com")
                 .password("Password123")

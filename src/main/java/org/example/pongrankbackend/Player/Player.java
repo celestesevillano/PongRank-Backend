@@ -10,6 +10,7 @@ import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,7 +19,8 @@ import java.util.List;
 @Table(
     name = "players",
     indexes = {
-        @Index(name = "idx_player_email", columnList = "email")
+        @Index(name = "idx_player_email", columnList = "email"),
+        @Index(name = "idx_player_username", columnList = "username")
     }
 )
 @Getter
@@ -36,6 +38,17 @@ public class Player {
     @Size(max = 100)
     @Column(nullable = false, length = 100)
     private String name;
+
+    @Size(max = 30)
+    @Column(unique = true, length = 30)
+    private String username;
+
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private Gender gender;
 
     @NotBlank
     @Email

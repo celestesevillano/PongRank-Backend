@@ -87,6 +87,9 @@ class PlayerServiceImplTest {
     @Mock
     private PlayerAccessGuard playerAccessGuard;
 
+    @org.mockito.Spy
+    private AgeCategorySuggester ageCategorySuggester = new AgeCategorySuggester();
+
     @InjectMocks
     private PlayerServiceImpl playerService;
 
@@ -177,6 +180,100 @@ class PlayerServiceImplTest {
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(playerId);
         verify(playerRepository).findById(playerId);
+    }
+
+    @Test
+    @DisplayName("getPlayerById: oculta la fecha de nacimiento a quien no es el dueño ni admin")
+    void getPlayerById_HidesBirthDateFromOthers() {
+        Long playerId = 1L;
+        Player player = Player.builder().id(playerId).name("Carlos Gomez").shareContact(true).build();
+        PlayerResponseDTO responseDto = PlayerResponseDTO.builder().id(playerId)
+                .birthDate(java.time.LocalDate.of(2012, 5, 20)).build();
+
+        actingAs(2L);
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
+        when(modelMapper.map(player, PlayerResponseDTO.class)).thenReturn(responseDto);
+
+        PlayerResponseDTO result = playerService.getPlayerById(playerId);
+
+        assertThat(result.getBirthDate()).isNull();
+    }
+
+    @Test
+    @DisplayName("getPlayerById: el dueño del perfil sí ve su fecha de nacimiento")
+    void getPlayerById_OwnerSeesBirthDate() {
+        Long playerId = 1L;
+        Player player = Player.builder().id(playerId).name("Carlos Gomez").build();
+        PlayerResponseDTO responseDto = PlayerResponseDTO.builder().id(playerId)
+                .birthDate(java.time.LocalDate.of(2012, 5, 20)).build();
+
+        actingAs(playerId);
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
+        when(modelMapper.map(player, PlayerResponseDTO.class)).thenReturn(responseDto);
+
+        PlayerResponseDTO result = playerService.getPlayerById(playerId);
+
+        assertThat(result.getBirthDate()).isEqualTo(java.time.LocalDate.of(2012, 5, 20));
+    }
+
+    @Test
+    @DisplayName("updatePlayer: lanza ConflictException si el username ya lo usa otro jugador")
+    void updatePlayer_UsernameTaken_ThrowsConflict() {
+        Long playerId = 1L;
+        Player existingPlayer = Player.builder().id(playerId).name("Carlos").build();
+        PlayerUpdateRequestDTO updateDto = PlayerUpdateRequestDTO.builder().username("Carlos.TT").build();
+
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
+        when(playerRepository.existsByUsernameAndIdNot("carlos.tt", playerId)).thenReturn(true);
+
+        assertThatThrownBy(() -> playerService.updatePlayer(playerId, updateDto))
+                .isInstanceOf(ConflictException.class);
+
+        verify(playerRepository, never()).save(any(Player.class));
+    }
+
+    @Test
+    @DisplayName("updatePlayer: guarda el username en minúsculas")
+    void updatePlayer_NormalizesUsername() {
+        Long playerId = 1L;
+        Player existingPlayer = Player.builder().id(playerId).name("Carlos").build();
+        PlayerUpdateRequestDTO updateDto = PlayerUpdateRequestDTO.builder().username("Carlos.TT").build();
+
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
+        when(playerRepository.existsByUsernameAndIdNot("carlos.tt", playerId)).thenReturn(false);
+        doNothing().when(modelMapper).map(updateDto, existingPlayer);
+        when(playerRepository.save(existingPlayer)).thenReturn(existingPlayer);
+        when(modelMapper.map(existingPlayer, PlayerResponseDTO.class)).thenReturn(new PlayerResponseDTO());
+
+        playerService.updatePlayer(playerId, updateDto);
+
+        assertThat(updateDto.getUsername()).isEqualTo("carlos.tt");
+        verify(modelMapper).map(updateDto, existingPlayer);
+    }
+
+    @Test
+    @DisplayName("suggestCategory: devuelve la categoría sugerida por edad y sexo con su nota")
+    void suggestCategory_ReturnsSuggestionWithNote() {
+        var dto = org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO.builder()
+                .birthDate(java.time.LocalDate.now().minusYears(12))
+                .gender(org.example.pongrankbackend.Player.Gender.MALE)
+                .build();
+
+        var result = playerService.suggestCategory(dto);
+
+        assertThat(result.getAge()).isEqualTo(12);
+        assertThat(result.getCategory()).isEqualTo("Varones 13 años");
+        assertThat(result.getNote()).contains("no está verificada");
+    }
+
+    @Test
+    @DisplayName("getInitialLevels: devuelve los cinco niveles con su frase corta")
+    void getInitialLevels_ReturnsAllLevelsWithLabels() {
+        var levels = playerService.getInitialLevels();
+
+        assertThat(levels).hasSize(5);
+        assertThat(levels.get(0).getLevel()).isEqualTo(org.example.pongrankbackend.Player.InitialLevel.NEW);
+        assertThat(levels.get(0).getLabel()).isEqualTo("Nunca he jugado");
     }
 
     @Test

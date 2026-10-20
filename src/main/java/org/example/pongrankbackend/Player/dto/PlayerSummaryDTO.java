@@ -13,6 +13,7 @@ public class PlayerSummaryDTO {
 
     private Long id;
     private String name;
+    private String username;
     private Double ratingGlicko;
     private String categoryFdptm;
     private Boolean federatedDeclared;

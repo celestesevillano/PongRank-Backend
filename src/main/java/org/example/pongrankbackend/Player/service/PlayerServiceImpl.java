@@ -11,9 +11,13 @@ import org.example.pongrankbackend.CommunityMembership.MembershipStatus;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
 import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
+import org.example.pongrankbackend.Player.InitialLevel;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.PlayerStatus;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO;
+import org.example.pongrankbackend.Player.dto.CategorySuggestionResponseDTO;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
+import org.example.pongrankbackend.Player.dto.InitialLevelResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
@@ -33,8 +37,11 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 @Service
 @Transactional(readOnly = true)
@@ -50,6 +57,7 @@ public class PlayerServiceImpl implements PlayerService {
     private final ModelMapper modelMapper;
     private final AuthService authService;
     private final PlayerAccessGuard playerAccessGuard;
+    private final AgeCategorySuggester ageCategorySuggester;
 
     public PlayerServiceImpl(PlayerRepository playerRepository,
                              ClubRepository clubRepository,
@@ -60,7 +68,8 @@ public class PlayerServiceImpl implements PlayerService {
                              ApplicationEventPublisher eventPublisher,
                              ModelMapper modelMapper,
                              AuthService authService,
-                             PlayerAccessGuard playerAccessGuard) {
+                             PlayerAccessGuard playerAccessGuard,
+                             AgeCategorySuggester ageCategorySuggester) {
         this.playerRepository = playerRepository;
         this.clubRepository = clubRepository;
         this.clubMembershipRepository = clubMembershipRepository;
@@ -71,6 +80,7 @@ public class PlayerServiceImpl implements PlayerService {
         this.modelMapper = modelMapper;
         this.authService = authService;
         this.playerAccessGuard = playerAccessGuard;
+        this.ageCategorySuggester = ageCategorySuggester;
     }
 
     @Override
@@ -92,6 +102,10 @@ public class PlayerServiceImpl implements PlayerService {
             response.setEmail(null);
             response.setWhatsapp(null);
         }
+        if (!isOwnerOrAdmin) {
+            response.setBirthDate(null);
+            response.setGender(null);
+        }
         return response;
     }
 
@@ -103,11 +117,36 @@ public class PlayerServiceImpl implements PlayerService {
     }
 
     @Override
+    public List<InitialLevelResponseDTO> getInitialLevels() {
+        return Arrays.stream(InitialLevel.values())
+                .map(level -> new InitialLevelResponseDTO(level, level.getLabel()))
+                .toList();
+    }
+
+    @Override
+    public CategorySuggestionResponseDTO suggestCategory(CategorySuggestionRequestDTO dto) {
+        LocalDate today = LocalDate.now();
+        return CategorySuggestionResponseDTO.builder()
+                .category(ageCategorySuggester.suggest(dto.getBirthDate(), dto.getGender(), today))
+                .age(ageCategorySuggester.ageInYear(dto.getBirthDate(), today))
+                .note("Sugerencia según tu edad este año. Tú declaras tu categoría; no está verificada con la federación.")
+                .build();
+    }
+
+    @Override
     @Transactional
     public PlayerResponseDTO updatePlayer(Long playerId, PlayerUpdateRequestDTO dto) {
         playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes actualizar la información de tu propio perfil");
         Player player = playerRepository.findById(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
+
+        if (dto.getUsername() != null) {
+            String normalizedUsername = dto.getUsername().toLowerCase(Locale.ROOT);
+            if (playerRepository.existsByUsernameAndIdNot(normalizedUsername, playerId)) {
+                throw new ConflictException("El nombre de usuario '" + normalizedUsername + "' ya está en uso");
+            }
+            dto.setUsername(normalizedUsername);
+        }
 
         modelMapper.map(dto, player);
 
