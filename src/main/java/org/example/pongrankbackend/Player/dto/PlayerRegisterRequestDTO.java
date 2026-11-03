@@ -2,8 +2,11 @@ package org.example.pongrankbackend.Player.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Past;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import org.example.pongrankbackend.Player.Gender;
+import java.time.LocalDate;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -34,6 +37,11 @@ public class PlayerRegisterRequestDTO {
 
     @Builder.Default
     private Boolean shareContact = false;
+
+    @Past(message = "La fecha de nacimiento debe ser una fecha pasada")
+    private LocalDate birthDate;
+
+    private Gender gender;
 
     @Size(max = 50, message = "La categoría FDPTM no debe exceder 50 caracteres")
     private String categoryFdptm;

@@ -4,9 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.pongrankbackend.Player.Gender;
 import org.example.pongrankbackend.Player.PlayerStatus;
 import org.example.pongrankbackend.Player.Role;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -20,6 +22,8 @@ public class PlayerResponseDTO {
     private String email;
     private String whatsapp;
     private Boolean shareContact;
+    private LocalDate birthDate;
+    private Gender gender;
     private String categoryFdptm;
     private Boolean federatedDeclared;
     private Double ratingGlicko;

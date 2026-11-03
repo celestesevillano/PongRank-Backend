@@ -10,6 +10,7 @@ import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.TrainingSession.TrainingSession;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -58,6 +59,13 @@ public class Player {
     @Size(max = 50)
     @Column(name = "category_fdptm", length = 50)
     private String categoryFdptm;
+
+    @Column(name = "birth_date")
+    private LocalDate birthDate;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private Gender gender;
 
     @Column(name = "federated_declared", nullable = false)
     @Builder.Default
