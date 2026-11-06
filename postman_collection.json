@@ -7092,6 +7092,58 @@
               "body": "{\n  \"timestamp\": \"2026-10-17T00:56:08.483875869\",\n  \"status\": 404,\n  \"error\": \"Not Found\",\n  \"message\": \"Transacción no encontrada con ID: 999\",\n  \"path\": \"/api/v1/payments/status/999\"\n}"
             }
           ]
+        },
+        {
+          "name": "Mi plan",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/memberships/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "memberships",
+                "me"
+              ]
+            },
+            "description": "Plan vigente del jugador autenticado: vencimiento, si incluye entrenador, si puede crear clubes y los límites de comunidades y clubes. Si no tiene plan pagado, devuelve FREEMIUM sin fecha."
+          },
+          "response": [
+            {
+              "name": "Éxito (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/memberships/me",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "memberships",
+                    "me"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"plan\": \"PRO\",\n  \"endDate\": \"2026-12-05T10:00:00.000000000\",\n  \"coachAccess\": true,\n  \"canCreateClub\": false,\n  \"maxCommunitiesCreated\": 8,\n  \"maxCommunitiesTotal\": 10,\n  \"maxClubsTotal\": 5\n}"
+            }
+          ]
         }
       ]
     },
