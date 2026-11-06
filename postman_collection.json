@@ -7094,6 +7094,183 @@
           ]
         }
       ]
+    },
+    {
+      "name": "13. Avisos de Club",
+      "item": [
+        {
+          "name": "Publicar aviso",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/announcements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "announcements"
+              ]
+            },
+            "description": "Solo el administrador del club publica un aviso para sus miembros.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Torneo interno\",\n  \"body\": \"El sábado a las 5 pm. en la sede.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [
+            {
+              "name": "Éxito (201)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/announcements",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "clubs",
+                    "{{clubId}}",
+                    "announcements"
+                  ]
+                },
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"title\": \"Torneo interno\",\n  \"body\": \"El sábado a las 5 pm. en la sede.\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"id\": 1,\n  \"clubId\": 1,\n  \"title\": \"Torneo interno\",\n  \"body\": \"El sábado a las 5 pm. en la sede.\",\n  \"authorName\": \"Andrea Vidal\",\n  \"createdAt\": \"2026-11-06T10:00:00.000000000\"\n}"
+            },
+            {
+              "name": "Sin permiso (403)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/announcements",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "clubs",
+                    "{{clubId}}",
+                    "announcements"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"message\": \"Solo el administrador del club puede publicar avisos\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Avisos del club",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/announcements?page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "{{clubId}}",
+                "announcements?page=0&size=10"
+              ]
+            },
+            "description": "Avisos del club, del más reciente al más antiguo. Solo miembros aprobados y administrador."
+          },
+          "response": [
+            {
+              "name": "Éxito (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/clubs/{{clubId}}/announcements?page=0&size=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "clubs",
+                    "{{clubId}}",
+                    "announcements?page=0&size=10"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"content\": [\n    {\n      \"id\": 1,\n      \"clubId\": 1,\n      \"title\": \"Torneo interno\",\n      \"body\": \"El sábado a las 5 pm. en la sede.\",\n      \"authorName\": \"Andrea Vidal\",\n      \"createdAt\": \"2026-11-06T10:00:00.000000000\"\n    }\n  ],\n  \"page\": 0,\n  \"size\": 10,\n  \"totalElements\": 1,\n  \"totalPages\": 1,\n  \"first\": true,\n  \"last\": true\n}"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
