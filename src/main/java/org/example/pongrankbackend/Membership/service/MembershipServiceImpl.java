@@ -36,6 +36,11 @@ public class MembershipServiceImpl implements MembershipService {
     }
 
     @Override
+    public Optional<LocalDateTime> getActivePlanEndDate(Long playerId) {
+        return activeMembership(playerId).map(Membership::getEndDate);
+    }
+
+    @Override
     public boolean isPaidMember(Long playerId) {
         return getActivePlan(playerId) != MembershipPlan.FREEMIUM;
     }

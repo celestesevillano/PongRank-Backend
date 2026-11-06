@@ -8,6 +8,9 @@ public interface MembershipService {
     // Plan efectivo del jugador: FREEMIUM si nunca tuvo membresía o su plan pagado ya venció
     MembershipPlan getActivePlan(Long playerId);
 
+    // Fecha de vencimiento del plan pagado vigente; vacío si es FREEMIUM
+    java.util.Optional<java.time.LocalDateTime> getActivePlanEndDate(Long playerId);
+
     boolean isPaidMember(Long playerId);
 
     boolean hasCoachAccess(Long playerId);
