@@ -47,7 +47,7 @@ public class Player {
     private LocalDate birthDate;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 10)
+    @Column(length = 20)
     private Gender gender;
 
     @NotBlank
