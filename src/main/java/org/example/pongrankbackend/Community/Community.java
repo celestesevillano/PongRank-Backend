@@ -34,7 +34,7 @@ public class Community {
 
     @NotBlank
     @Size(max = 120)
-    @Column(nullable = false, unique = true, length = 120)
+    @Column(nullable = false, length = 120)
     private String name;
 
     @Size(max = 500)
@@ -45,6 +45,9 @@ public class Community {
     @Enumerated(EnumType.STRING)
     @Column(name = "community_type", nullable = false, length = 30)
     private CommunityType communityType;
+
+    @Column(name = "custom_label", length = 40)
+    private String customLabel;
 
     // CAMBIOS: Habilita el borrado lógico
     // Estado del ciclo de vida. Por defecto toda comunidad nace ACTIVE..

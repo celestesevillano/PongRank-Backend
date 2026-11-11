@@ -22,4 +22,6 @@ public class CommunityCreateRequestDTO {
 
     @NotNull(message = "El tipo de comunidad es obligatorio")
     private CommunityType communityType;
+    @Size(max = 40, message = "La etiqueta debe tener como máximo 40 caracteres")
+    private String customLabel;
 }

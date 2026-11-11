@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 public class MyPlanServiceImpl implements MyPlanService {
 
     private final MembershipService membershipService;
+    private final SpaceQuotaService spaces;
 
     @Value("${community.max-created.freemium}")
     private int createdFreemium;
@@ -38,8 +39,9 @@ public class MyPlanServiceImpl implements MyPlanService {
     @Value("${club.max-total.enterprise}")
     private int clubsEnterprise;
 
-    public MyPlanServiceImpl(MembershipService membershipService) {
+    public MyPlanServiceImpl(MembershipService membershipService, SpaceQuotaService spaces) {
         this.membershipService = membershipService;
+        this.spaces = spaces;
     }
 
     @Override
@@ -54,6 +56,8 @@ public class MyPlanServiceImpl implements MyPlanService {
                 .maxCommunitiesCreated(pick(plan, createdFreemium, createdBasic, createdPro, createdEnterprise))
                 .maxCommunitiesTotal(pick(plan, communitiesFreemium, communitiesBasic, communitiesPro, communitiesEnterprise))
                 .maxClubsTotal(pick(plan, clubsFreemium, clubsBasic, clubsPro, clubsEnterprise))
+                .maxSpaces(spaces.limit(plan))
+                .usedSpaces(spaces.used(playerId))
                 .build();
     }
 

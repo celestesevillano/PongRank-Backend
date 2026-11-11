@@ -13,6 +13,7 @@ import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.Club.repository.ClubReviewRepository;
 import org.example.pongrankbackend.ClubMembership.service.ClubMembershipService;
 import org.example.pongrankbackend.Membership.service.MembershipService;
+import org.example.pongrankbackend.Membership.service.SpaceQuotaService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
@@ -73,6 +74,9 @@ class ClubServiceImplTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private SpaceQuotaService spaces;
 
     @InjectMocks
     private ClubServiceImpl clubService;

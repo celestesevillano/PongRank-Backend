@@ -11,6 +11,7 @@ import org.example.pongrankbackend.ClubMembership.dto.ClubMembershipResponseDTO;
 import org.example.pongrankbackend.ClubMembership.repository.ClubMembershipRepository;
 import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
+import org.example.pongrankbackend.Membership.service.SpaceQuotaService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
@@ -37,6 +38,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
     private final PlayerRepository playerRepository;
     private final MembershipService membershipService;
     private final ModelMapper modelMapper;
+    private final SpaceQuotaService spaces;
 
     @Value("${club.max-total.freemium}")
     private int maxTotalFreemium;
@@ -54,12 +56,13 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
                                      ClubRepository clubRepository,
                                      PlayerRepository playerRepository,
                                      MembershipService membershipService,
-                                     ModelMapper modelMapper) {
+                                     ModelMapper modelMapper, SpaceQuotaService spaces) {
         this.clubMembershipRepository = clubMembershipRepository;
         this.clubRepository = clubRepository;
         this.playerRepository = playerRepository;
         this.membershipService = membershipService;
         this.modelMapper = modelMapper;
+        this.spaces = spaces;
     }
 
     @Override
@@ -80,6 +83,7 @@ public class ClubMembershipServiceImpl implements ClubMembershipService {
             throw new ConflictException("El jugador administra un club en revisión o aprobado y no puede unirse a otro");
         }
 
+        spaces.requireAvailable(actingPlayerId);
         validateWithinPlanLimit(actingPlayerId);
 
         ClubMembership membership = ClubMembership.builder()

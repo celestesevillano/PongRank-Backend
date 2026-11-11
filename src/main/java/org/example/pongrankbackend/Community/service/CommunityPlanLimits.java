@@ -2,9 +2,7 @@ package org.example.pongrankbackend.Community.service;
 
 import org.example.pongrankbackend.Community.CommunityStatus;
 import org.example.pongrankbackend.Community.repository.CommunityRepository;
-import org.example.pongrankbackend.CommunityMembership.CommunityRole;
-import org.example.pongrankbackend.CommunityMembership.MembershipStatus;
-import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
+import org.example.pongrankbackend.Membership.service.SpaceQuotaService;
 import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
 import org.example.pongrankbackend.common.exception.PlanRestrictionException;
@@ -15,7 +13,7 @@ import org.springframework.stereotype.Component;
 public class CommunityPlanLimits {
 
     private final CommunityRepository communityRepository;
-    private final CommunityMembershipRepository membershipRepository;
+    private final SpaceQuotaService spaces;
     private final MembershipService membershipService;
 
     @Value("${community.max-created.freemium}")
@@ -30,23 +28,11 @@ public class CommunityPlanLimits {
     @Value("${community.max-created.enterprise}")
     private int maxCreatedEnterprise;
 
-    @Value("${community.max-total.freemium}")
-    private int maxTotalFreemium;
-
-    @Value("${community.max-total.basic}")
-    private int maxTotalBasic;
-
-    @Value("${community.max-total.pro}")
-    private int maxTotalPro;
-
-    @Value("${community.max-total.enterprise}")
-    private int maxTotalEnterprise;
-
     public CommunityPlanLimits(CommunityRepository communityRepository,
-                               CommunityMembershipRepository membershipRepository,
+                               SpaceQuotaService spaces,
                                MembershipService membershipService) {
         this.communityRepository = communityRepository;
-        this.membershipRepository = membershipRepository;
+        this.spaces = spaces;
         this.membershipService = membershipService;
     }
 
@@ -62,16 +48,7 @@ public class CommunityPlanLimits {
     }
 
     public void verifyTotalMembershipLimit(Long playerId) {
-        int limit = maxTotalFor(membershipService.getActivePlan(playerId));
-
-        long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
-        long activeMemberships = membershipRepository.countByPlayerIdAndRoleAndStatus(
-                playerId, CommunityRole.MEMBER, MembershipStatus.ACTIVE);
-
-        if (createdActive + activeMemberships >= limit) {
-            throw new PlanRestrictionException(
-                    "Player " + playerId + " reached the maximum of " + limit + " total communities for their plan");
-        }
+        spaces.requireAvailable(playerId);
     }
 
     private int maxCreatedFor(MembershipPlan plan) {
@@ -83,12 +60,4 @@ public class CommunityPlanLimits {
         };
     }
 
-    private int maxTotalFor(MembershipPlan plan) {
-        return switch (plan) {
-            case FREEMIUM -> maxTotalFreemium;
-            case BASIC -> maxTotalBasic;
-            case PRO -> maxTotalPro;
-            case ENTERPRISE -> maxTotalEnterprise;
-        };
-    }
 }

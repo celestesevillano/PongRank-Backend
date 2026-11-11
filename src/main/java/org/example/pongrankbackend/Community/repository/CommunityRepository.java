@@ -17,8 +17,8 @@ import java.util.Optional;
 @Repository
 public interface CommunityRepository extends JpaRepository<Community, Long> {
 
-    boolean existsByNameIgnoreCase(String name);
-    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
+    boolean existsByNameIgnoreCaseAndStatus(String name, CommunityStatus status);
+    boolean existsByNameIgnoreCaseAndStatusAndIdNot(String name, CommunityStatus status, Long id);
 
     long countByCreatorIdAndStatus(Long creatorId, CommunityStatus status);
 

@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.CommunityMembership.repository;
 
+import org.example.pongrankbackend.Community.CommunityStatus;
 import org.example.pongrankbackend.CommunityMembership.CommunityMembership;
 import org.example.pongrankbackend.CommunityMembership.CommunityRole;
 import org.example.pongrankbackend.CommunityMembership.MembershipStatus;
@@ -28,9 +29,8 @@ public interface CommunityMembershipRepository extends JpaRepository<CommunityMe
 
     long countByCommunityIdAndStatus(Long communityId, MembershipStatus status);
 
-    // rol MEMBER a propósito: la membership del creador es COMMUNITY_ADMIN, así que esto no duplica
-    // el conteo de comunidades creadas al calcular el total de pertenencia (creadas + unido como member)
-    long countByPlayerIdAndRoleAndStatus(Long playerId, CommunityRole role, MembershipStatus status);
+    long countByPlayerIdAndStatusAndCommunityStatus(
+            Long playerId, MembershipStatus status, CommunityStatus communityStatus);
 
     @Query(value = """
             SELECT m FROM CommunityMembership m
@@ -66,6 +66,15 @@ public interface CommunityMembershipRepository extends JpaRepository<CommunityMe
             """)
     List<CommunityMembership> findByPlayerIdWithCommunity(@Param("playerId") Long playerId,
                                                           @Param("status") MembershipStatus status);
+
+    @Query("""
+            SELECT m FROM CommunityMembership m
+            JOIN FETCH m.community
+            WHERE m.player.id = :playerId AND m.status = :status AND m.community.status = :communityStatus
+            """)
+    List<CommunityMembership> findByPlayerIdWithActiveCommunity(@Param("playerId") Long playerId,
+                                                                @Param("status") MembershipStatus status,
+                                                          @Param("communityStatus") CommunityStatus communityStatus);
 
     @Query("""
             SELECT m.community.id, COUNT(m)

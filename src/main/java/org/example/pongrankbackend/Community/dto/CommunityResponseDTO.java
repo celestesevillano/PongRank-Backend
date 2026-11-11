@@ -17,6 +17,7 @@ public class CommunityResponseDTO {
     private String name;
     private String description;
     private CommunityType communityType;
+    private String customLabel;
     private CommunityStatus status;
     private Long memberCount;
     private CommunityRole myRole;

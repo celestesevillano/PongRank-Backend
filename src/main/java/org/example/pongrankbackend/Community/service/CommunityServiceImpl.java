@@ -19,6 +19,7 @@ import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembe
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.InvalidCommunityException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -26,6 +27,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,11 +66,16 @@ public class CommunityServiceImpl implements CommunityService {
     public CommunityResponseDTO createCommunity(CommunityCreateRequestDTO dto, Long requesterId) {
         String name = dto.getName().trim();
 
-        if (communityRepository.existsByNameIgnoreCase(name)) {
+        if (communityRepository.existsByNameIgnoreCaseAndStatus(name, CommunityStatus.ACTIVE)) {
             throw new ConflictException("Community name already in use: " + name);
         }
 
         Player creator = loadPlayer(requesterId);
+        if (dto.getCommunityType() == CommunityType.OTHER
+                && (dto.getCustomLabel() == null || dto.getCustomLabel().isBlank())) {
+            throw new InvalidCommunityException("Escribe una etiqueta para el tipo Otro");
+        }
+        planLimits.verifyTotalMembershipLimit(requesterId);
         planLimits.verifyCreationLimit(requesterId);
         Community community = buildCommunity(dto, name, creator);
 
@@ -101,7 +108,7 @@ public class CommunityServiceImpl implements CommunityService {
     @Override
     public List<CommunityResponseDTO> getMyCommunities(Long requesterId) {
         List<CommunityMembership> memberships = membershipRepository
-                .findByPlayerIdWithCommunity(requesterId, MembershipStatus.ACTIVE);
+                .findByPlayerIdWithActiveCommunity(requesterId, MembershipStatus.ACTIVE, CommunityStatus.ACTIVE);
 
         List<Long> ids = memberships.stream()
                 .map(m -> m.getCommunity().getId())
@@ -122,11 +129,14 @@ public class CommunityServiceImpl implements CommunityService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Community not found with id: " + communityId));
 
-        CommunityRole myRole = findRequesterRole(communityId, requesterId);
+        CommunityRole myRole = community.getStatus() == CommunityStatus.ACTIVE
+                ? findRequesterRole(communityId, requesterId) : null;
         long memberCount = membershipRepository
                 .countByCommunityIdAndStatus(communityId, MembershipStatus.ACTIVE);
 
-        return communityMapper.toDetailDto(community, myRole, memberCount);
+        long adminCount = membershipRepository.countByCommunityIdAndRoleAndStatus(
+                communityId, CommunityRole.COMMUNITY_ADMIN, MembershipStatus.ACTIVE);
+        return communityMapper.toDetailDto(community, myRole, memberCount, adminCount);
     }
 
     @Override
@@ -139,7 +149,7 @@ public class CommunityServiceImpl implements CommunityService {
 
         String name = dto.getName().trim();
 
-        if (communityRepository.existsByNameIgnoreCaseAndIdNot(name, communityId)) {
+        if (communityRepository.existsByNameIgnoreCaseAndStatusAndIdNot(name, CommunityStatus.ACTIVE, communityId)) {
             throw new ConflictException("Community name already in use: " + name);
         }
 
@@ -155,11 +165,13 @@ public class CommunityServiceImpl implements CommunityService {
     @Override
     @Transactional
     public void archiveCommunity(Long communityId, Long requesterId) {
-        Community community = loadCommunity(communityId);
+        Community community = communityRepository.findByIdForUpdate(communityId)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos la comunidad"));
         accessPolicy.verifyCommunityIsActive(community);
         accessPolicy.verifyRequesterIsAdmin(communityId, requesterId);
 
         community.setStatus(CommunityStatus.ARCHIVED);
+        community.setArchivedAt(LocalDateTime.now());
     }
 
     @Override
@@ -212,6 +224,7 @@ public class CommunityServiceImpl implements CommunityService {
                 .name(name)
                 .description(dto.getDescription())
                 .communityType(dto.getCommunityType())
+                .customLabel(dto.getCommunityType() == CommunityType.OTHER ? dto.getCustomLabel().strip() : null)
                 .status(CommunityStatus.ACTIVE)
                 .creator(creator)
                 .build();

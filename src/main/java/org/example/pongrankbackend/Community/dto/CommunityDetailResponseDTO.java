@@ -17,8 +17,10 @@ public class CommunityDetailResponseDTO {
     private String name;
     private String description;
     private CommunityType communityType;
+    private String customLabel;
     private CommunityStatus status;
     private Long memberCount;
+    private long adminCount;
     private Long creatorId;
     private String creatorName;
     private Boolean isMember;
