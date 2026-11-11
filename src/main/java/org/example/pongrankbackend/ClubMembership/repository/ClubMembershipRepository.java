@@ -1,10 +1,13 @@
 package org.example.pongrankbackend.ClubMembership.repository;
 
+import org.example.pongrankbackend.Club.ClubStatus;
 import org.example.pongrankbackend.ClubMembership.ClubMembership;
 import org.example.pongrankbackend.ClubMembership.ClubMembershipStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
@@ -16,6 +19,15 @@ public interface ClubMembershipRepository extends JpaRepository<ClubMembership, 
     boolean existsByPlayerIdAndClubIdAndStatusIn(Long playerId, Long clubId, Collection<ClubMembershipStatus> statuses);
 
     long countByPlayerIdAndStatusIn(Long playerId, Collection<ClubMembershipStatus> statuses);
+
+    @Query("""
+            SELECT COUNT(DISTINCT m.club.id) FROM ClubMembership m
+            WHERE m.player.id = :playerId AND m.status IN :statuses
+              AND m.club.status = :clubStatus AND m.club.admin.id <> :playerId
+            """)
+    long countDistinctOtherClubs(@Param("playerId") Long playerId,
+                                 @Param("statuses") Collection<ClubMembershipStatus> statuses,
+                                 @Param("clubStatus") ClubStatus clubStatus);
 
     Optional<ClubMembership> findByPlayerIdAndClubIdAndStatus(Long playerId, Long clubId, ClubMembershipStatus status);
 

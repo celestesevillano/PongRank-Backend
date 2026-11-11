@@ -110,6 +110,7 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
     @Transactional
     public void removeMember(Long communityId, Long playerId, Long requesterId) {
         Community community = loadCommunityForUpdate(communityId);
+        accessPolicy.verifyCommunityIsActive(community);
 
         boolean isSelfRemoval = playerId.equals(requesterId);
         if (!isSelfRemoval) {
@@ -129,6 +130,7 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
 
         if (activeMembers == 1) {
             community.setStatus(CommunityStatus.ARCHIVED);
+            community.setArchivedAt(LocalDateTime.now());
         }
     }
 

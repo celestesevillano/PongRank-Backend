@@ -32,14 +32,16 @@ public class CommunityMapper {
     }
 
     public CommunityDetailResponseDTO toDetailDto(Community community, CommunityRole myRole,
-                                                  long memberCount) {
+                                                  long memberCount, long adminCount) {
         return CommunityDetailResponseDTO.builder()
                 .id(community.getId())
                 .name(community.getName())
                 .description(community.getDescription())
                 .communityType(community.getCommunityType())
+                .customLabel(community.getCustomLabel())
                 .status(community.getStatus())
                 .memberCount(memberCount)
+                .adminCount(adminCount)
                 .creatorId(community.getCreator().getId())
                 .creatorName(community.getCreator().getName())
                 .isMember(myRole != null)

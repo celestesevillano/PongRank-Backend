@@ -22,4 +22,6 @@ public class MyPlanResponseDTO {
     private int maxCommunitiesCreated;
     private int maxCommunitiesTotal;
     private int maxClubsTotal;
+    private int maxSpaces;
+    private long usedSpaces;
 }

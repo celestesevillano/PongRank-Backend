@@ -18,6 +18,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.example.pongrankbackend.Membership.service.SpaceQuotaService;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -64,6 +65,9 @@ class ClubMembershipServiceImplTest {
 
     @Mock
     private ModelMapper modelMapper;
+
+    @Mock
+    private SpaceQuotaService spaces;
 
     @InjectMocks
     private ClubMembershipServiceImpl clubMembershipService;

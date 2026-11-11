@@ -56,8 +56,8 @@ class CommunityMapperTest {
     void toDetailDto_IsMemberDependsOnRole() {
         Community community = community(player(1L, "Ana", 1700));
 
-        CommunityDetailResponseDTO asMember = mapper.toDetailDto(community, CommunityRole.MEMBER, 3L);
-        CommunityDetailResponseDTO asVisitor = mapper.toDetailDto(community, null, 3L);
+        CommunityDetailResponseDTO asMember = mapper.toDetailDto(community, CommunityRole.MEMBER, 3L, 1L);
+        CommunityDetailResponseDTO asVisitor = mapper.toDetailDto(community, null, 3L, 1L);
 
         assertThat(asMember.getIsMember()).isTrue();
         assertThat(asVisitor.getIsMember()).isFalse();

@@ -16,6 +16,7 @@ import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.Club.repository.ClubReviewRepository;
 import org.example.pongrankbackend.ClubMembership.service.ClubMembershipService;
 import org.example.pongrankbackend.Membership.service.MembershipService;
+import org.example.pongrankbackend.Membership.service.SpaceQuotaService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.Role;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
@@ -43,6 +44,7 @@ public class ClubServiceImpl implements ClubService {
     private final ClubMembershipService clubMembershipService;
     private final MembershipService membershipService;
     private final ModelMapper modelMapper;
+    private final SpaceQuotaService spaces;
 
     @Value("${club.max-administered.enterprise}")
     private int maxAdministeredEnterprise;
@@ -55,13 +57,14 @@ public class ClubServiceImpl implements ClubService {
                            PlayerRepository playerRepository,
                            ClubMembershipService clubMembershipService,
                            MembershipService membershipService,
-                           ModelMapper modelMapper) {
+                           ModelMapper modelMapper, SpaceQuotaService spaces) {
         this.clubRepository = clubRepository;
         this.clubReviewRepository = clubReviewRepository;
         this.playerRepository = playerRepository;
         this.clubMembershipService = clubMembershipService;
         this.membershipService = membershipService;
         this.modelMapper = modelMapper;
+        this.spaces = spaces;
     }
 
     @Override
@@ -74,6 +77,7 @@ public class ClubServiceImpl implements ClubService {
             throw new PlanRestrictionException("Solo los jugadores con plan ENTERPRISE pueden crear un club");
         }
 
+        spaces.requireAvailable(requesterId);
         validateCanAdministerClub(requesterId, null);
 
         String normalizedName = dto.getName().trim();
@@ -148,6 +152,7 @@ public class ClubServiceImpl implements ClubService {
         validateClubStatus(club, ClubStatus.REJECTED, "Solo un club rechazado puede reenviarse a revisión");
         validateCanAdministerClub(actingPlayerId, clubId);
 
+        spaces.requireAvailable(actingPlayerId);
         return sendToReview(club, dto.getAffiliationDocumentUrl());
     }
 

@@ -15,6 +15,9 @@ import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRoleUp
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
 import org.example.pongrankbackend.Membership.MembershipPlan;
 import org.example.pongrankbackend.Membership.service.MembershipService;
+import org.example.pongrankbackend.Membership.service.SpaceQuotaService;
+import org.example.pongrankbackend.Club.repository.ClubRepository;
+import org.example.pongrankbackend.ClubMembership.repository.ClubMembershipRepository;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ApiException;
@@ -60,6 +63,12 @@ class CommunityServiceImplTest {
     @Mock
     private MembershipService membershipService;
 
+    @Mock
+    private ClubRepository clubRepository;
+
+    @Mock
+    private ClubMembershipRepository clubMembershipRepository;
+
     private CommunityPlanLimits planLimits;
     private CommunityServiceImpl communityService;
 
@@ -70,7 +79,9 @@ class CommunityServiceImplTest {
     void setUp() {
         CommunityMapper communityMapper = new CommunityMapper(modelMapper);
         CommunityAccessPolicy accessPolicy = new CommunityAccessPolicy(membershipRepository);
-        planLimits = new CommunityPlanLimits(communityRepository, membershipRepository, membershipService);
+        SpaceQuotaService spaces = new SpaceQuotaService(playerRepository, membershipRepository,
+                clubRepository, clubMembershipRepository, membershipService);
+        planLimits = new CommunityPlanLimits(communityRepository, spaces, membershipService);
         CommunityMemberService memberService = new CommunityMemberServiceImpl(
                 communityRepository, membershipRepository, playerRepository,
                 communityMapper, accessPolicy, planLimits);
@@ -82,10 +93,10 @@ class CommunityServiceImplTest {
         ReflectionTestUtils.setField(planLimits, "maxCreatedBasic", 5);
         ReflectionTestUtils.setField(planLimits, "maxCreatedPro", 8);
         ReflectionTestUtils.setField(planLimits, "maxCreatedEnterprise", 8);
-        ReflectionTestUtils.setField(planLimits, "maxTotalFreemium", 2);
-        ReflectionTestUtils.setField(planLimits, "maxTotalBasic", 7);
-        ReflectionTestUtils.setField(planLimits, "maxTotalPro", 10);
-        ReflectionTestUtils.setField(planLimits, "maxTotalEnterprise", 10);
+        ReflectionTestUtils.setField(spaces, "maxFree", 2);
+        ReflectionTestUtils.setField(spaces, "maxBasic", 7);
+        ReflectionTestUtils.setField(spaces, "maxPro", 10);
+        ReflectionTestUtils.setField(spaces, "maxEnterprise", 10);
 
         lenient().when(membershipService.getActivePlan(anyLong())).thenReturn(MembershipPlan.FREEMIUM);
 
@@ -148,8 +159,8 @@ class CommunityServiceImplTest {
     }
 
     private void givenActiveMemberships(long count) {
-        when(membershipRepository.countByPlayerIdAndRoleAndStatus(
-                anyLong(), eq(CommunityRole.MEMBER), eq(MembershipStatus.ACTIVE))).thenReturn(count);
+        when(membershipRepository.countByPlayerIdAndStatusAndCommunityStatus(
+                anyLong(), eq(MembershipStatus.ACTIVE), eq(CommunityStatus.ACTIVE))).thenReturn(count);
     }
 
     private void thenFailsWith(HttpStatus expected, Runnable action) {
@@ -168,7 +179,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("registra al creador como administrador activo")
         void shouldCreateAdminMembershipWhenCommunityIsCreated() {
-            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(false);
+            when(communityRepository.existsByNameIgnoreCaseAndStatus(anyString(), eq(CommunityStatus.ACTIVE))).thenReturn(false);
             when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
             when(communityRepository.save(any(Community.class))).thenReturn(community);
             when(modelMapper.map(any(Community.class), eq(CommunityResponseDTO.class)))
@@ -185,7 +196,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("responde 409 cuando el nombre ya existe")
         void shouldThrowExceptionWhenCommunityNameIsDuplicated() {
-            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(true);
+            when(communityRepository.existsByNameIgnoreCaseAndStatus(anyString(), eq(CommunityStatus.ACTIVE))).thenReturn(true);
 
             thenFailsWith(HttpStatus.CONFLICT,
                     () -> communityService.createCommunity(createRequest(), CREATOR_ID));
@@ -197,7 +208,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("responde 404 cuando el creador no existe")
         void shouldThrowExceptionWhenCreatorDoesNotExist() {
-            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(false);
+            when(communityRepository.existsByNameIgnoreCaseAndStatus(anyString(), eq(CommunityStatus.ACTIVE))).thenReturn(false);
             when(playerRepository.findById(anyLong())).thenReturn(Optional.empty());
 
             thenFailsWith(HttpStatus.NOT_FOUND,
@@ -239,7 +250,7 @@ class CommunityServiceImplTest {
         void shouldThrowExceptionWhenNewNameBelongsToAnotherCommunity() {
             when(communityRepository.findById(COMMUNITY_ID)).thenReturn(Optional.of(community));
             givenRequesterIsAdmin(true);
-            when(communityRepository.existsByNameIgnoreCaseAndIdNot(anyString(), anyLong()))
+            when(communityRepository.existsByNameIgnoreCaseAndStatusAndIdNot(anyString(), eq(CommunityStatus.ACTIVE), anyLong()))
                     .thenReturn(true);
 
             thenFailsWith(HttpStatus.CONFLICT, () -> communityService.updateCommunity(
@@ -251,7 +262,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("archivar cambia el estado sin borrar el registro")
         void shouldSetStatusArchivedWhenCommunityIsDeleted() {
-            when(communityRepository.findById(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
             givenRequesterIsAdmin(true);
 
             communityService.archiveCommunity(COMMUNITY_ID, CREATOR_ID);
@@ -265,7 +276,7 @@ class CommunityServiceImplTest {
         @DisplayName("responde 409 al archivar una comunidad ya archivada")
         void shouldThrowExceptionWhenArchivingArchivedCommunity() {
             community.setStatus(CommunityStatus.ARCHIVED);
-            when(communityRepository.findById(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
 
             thenFailsWith(HttpStatus.CONFLICT,
                     () -> communityService.archiveCommunity(COMMUNITY_ID, CREATOR_ID));
@@ -347,7 +358,7 @@ class CommunityServiceImplTest {
     class CreationLimit {
 
         private void givenSuccessfulCreationPath() {
-            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(false);
+            when(communityRepository.existsByNameIgnoreCaseAndStatus(anyString(), eq(CommunityStatus.ACTIVE))).thenReturn(false);
             when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
             when(communityRepository.save(any(Community.class))).thenReturn(community);
             when(modelMapper.map(any(Community.class), eq(CommunityResponseDTO.class)))
@@ -355,7 +366,7 @@ class CommunityServiceImplTest {
         }
 
         private void givenRejectedCreationPath() {
-            when(communityRepository.existsByNameIgnoreCase(anyString())).thenReturn(false);
+            when(communityRepository.existsByNameIgnoreCaseAndStatus(anyString(), eq(CommunityStatus.ACTIVE))).thenReturn(false);
             when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
         }
 
@@ -459,7 +470,6 @@ class CommunityServiceImplTest {
         @DisplayName("freemium: permite unirse justo debajo del limite (1 de 2)")
         void freemium_JustBelowLimit_Allows() {
             givenIsPremium(false);
-            givenActiveCommunitiesCreated(0L);
             givenActiveMemberships(1L);
             givenRejoinAllowed();
 
@@ -472,8 +482,7 @@ class CommunityServiceImplTest {
         @DisplayName("freemium: rechaza justo en el limite (2 de 2)")
         void freemium_AtLimit_Rejects() {
             givenIsPremium(false);
-            givenActiveCommunitiesCreated(1L);
-            givenActiveMemberships(1L);
+            givenActiveMemberships(2L);
             givenJoinRejected();
 
             thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
@@ -484,8 +493,7 @@ class CommunityServiceImplTest {
         @DisplayName("freemium: rechaza por encima del limite (3 de 2)")
         void freemium_AboveLimit_Rejects() {
             givenIsPremium(false);
-            givenActiveCommunitiesCreated(1L);
-            givenActiveMemberships(2L);
+            givenActiveMemberships(3L);
             givenJoinRejected();
 
             thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
@@ -498,8 +506,7 @@ class CommunityServiceImplTest {
         @DisplayName("premium: permite unirse justo debajo del limite (5 creadas + 1 = 6 de 7)")
         void premium_JustBelowLimit_Allows() {
             givenIsPremium(true);
-            givenActiveCommunitiesCreated(5L);
-            givenActiveMemberships(1L);
+            givenActiveMemberships(6L);
             givenRejoinAllowed();
 
             communityService.addMember(COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID);
@@ -511,8 +518,7 @@ class CommunityServiceImplTest {
         @DisplayName("premium: rechaza justo en el limite (5 creadas + 2 = 7 de 7)")
         void premium_AtLimit_Rejects() {
             givenIsPremium(true);
-            givenActiveCommunitiesCreated(5L);
-            givenActiveMemberships(2L);
+            givenActiveMemberships(7L);
             givenJoinRejected();
 
             thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
@@ -523,13 +529,34 @@ class CommunityServiceImplTest {
         @DisplayName("premium: rechaza por encima del limite (5 creadas + 3 = 8 de 7)")
         void premium_AboveLimit_Rejects() {
             givenIsPremium(true);
-            givenActiveCommunitiesCreated(5L);
-            givenActiveMemberships(3L);
+            givenActiveMemberships(8L);
             givenJoinRejected();
 
             thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.addMember(
                     COMMUNITY_ID, new CommunityMemberAddRequestDTO(), CREATOR_ID));
         }
+    }
+
+    @Test
+    void clubAndCommunityShareQuotaWhenCreating() {
+        givenIsPremium(true);
+        givenActiveMemberships(3L);
+        when(clubMembershipRepository.countDistinctOtherClubs(eq(CREATOR_ID), any(), any())).thenReturn(4L);
+        when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
+
+        thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.createCommunity(createRequest(), CREATOR_ID));
+        verify(communityRepository, never()).save(any());
+    }
+
+    @Test
+    void otherCommunityRequiresNonBlankLabel() {
+        var request = createRequest();
+        request.setCommunityType(CommunityType.OTHER);
+        request.setCustomLabel("  ");
+        when(playerRepository.findById(CREATOR_ID)).thenReturn(Optional.of(creator));
+
+        thenFailsWith(HttpStatus.BAD_REQUEST, () -> communityService.createCommunity(request, CREATOR_ID));
+        verify(communityRepository, never()).save(any());
     }
 
     // ---------- EP10, EP11 ----------

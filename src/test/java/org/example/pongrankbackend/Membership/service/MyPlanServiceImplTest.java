@@ -31,6 +31,9 @@ class MyPlanServiceImplTest {
     @Mock
     private MembershipService membershipService;
 
+    @Mock
+    private SpaceQuotaService spaces;
+
     @InjectMocks
     private MyPlanServiceImpl service;
 
