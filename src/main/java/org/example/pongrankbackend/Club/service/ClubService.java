@@ -12,11 +12,15 @@ import org.example.pongrankbackend.Club.dto.ClubUpdateRequestDTO;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 
 // El jugador que actúa en cada operación se lee del SecurityContext (SecurityUtils), no se recibe como parámetro.
+import java.util.List;
+
 public interface ClubService {
 
     ClubResponseDTO registerClub(ClubRegisterRequestDTO dto);
 
-    PageResponseDTO<ClubResponseDTO> getApprovedClubs(int page, int size);
+    PageResponseDTO<ClubResponseDTO> getApprovedClubs(String name, int page, int size);
+
+    List<ClubResponseDTO> getManagedClubs();
 
     ClubResponseDTO getClubById(Long clubId);
 

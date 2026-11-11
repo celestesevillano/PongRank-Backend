@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/clubs")
 public class ClubController {
@@ -35,10 +37,17 @@ public class ClubController {
 
     @GetMapping
     public ResponseEntity<PageResponseDTO<ClubResponseDTO>> getApprovedClubs(
+            @RequestParam(required = false) String name,
             @RequestParam(defaultValue = PageRequestFactory.DEFAULT_PAGE) int page,
             @RequestParam(defaultValue = PageRequestFactory.DEFAULT_SIZE) int size) {
-        PageResponseDTO<ClubResponseDTO> response = clubService.getApprovedClubs(page, size);
+        PageResponseDTO<ClubResponseDTO> response = clubService.getApprovedClubs(name, page, size);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<ClubResponseDTO>> getManagedClubs() {
+        return ResponseEntity.ok(clubService.getManagedClubs());
     }
 
     @GetMapping("/{clubId}")

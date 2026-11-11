@@ -185,7 +185,7 @@ class ClubControllerTest {
                 .last(true)
                 .build();
 
-        given(clubService.getApprovedClubs(0, 10)).willReturn(pageResponse);
+        given(clubService.getApprovedClubs(null, 0, 10)).willReturn(pageResponse);
 
         mockMvc.perform(get("/api/v1/clubs?page=0&size=10"))
                 .andExpect(status().isOk())

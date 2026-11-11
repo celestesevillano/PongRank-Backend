@@ -86,6 +86,16 @@ class ClubRepositoryTest {
     }
 
     @Test
+    void searchesOnlyApprovedClubsByName() {
+        var page = PageRequest.of(0, 10);
+        var approved = clubRepository.findByStatusAndNameContainingIgnoreCase(ClubStatus.APPROVED, "mIrAfLoReS", page);
+        var pending = clubRepository.findByStatusAndNameContainingIgnoreCase(ClubStatus.APPROVED, "san isidro", page);
+
+        assertThat(approved.getContent()).extracting(Club::getId).containsExactly(approvedClub.getId());
+        assertThat(pending.getContent()).isEmpty();
+    }
+
+    @Test
     @DisplayName("existsByNameIgnoreCase - Detecta nombres existentes sin importar mayúsculas o minúsculas")
     void existsByNameIgnoreCase_MatchesCaseInsensitively() {
         boolean existsUpper = clubRepository.existsByNameIgnoreCase("CLUB TENIS DE MESA MIRAFLORES");

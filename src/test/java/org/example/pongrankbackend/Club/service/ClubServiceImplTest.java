@@ -432,12 +432,12 @@ class ClubServiceImplTest {
         when(clubRepository.findByStatus(eq(ClubStatus.APPROVED), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(club(ClubStatus.APPROVED)), PageRequest.of(0, 10), 23));
 
-        PageResponseDTO<ClubResponseDTO> result = clubService.getApprovedClubs(0, 500);
+        PageResponseDTO<ClubResponseDTO> result = clubService.getApprovedClubs(null, 0, 500);
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(clubRepository).findByStatus(eq(ClubStatus.APPROVED), captor.capture());
         assertThat(captor.getValue().getPageSize()).isEqualTo(PageRequestFactory.MAX_SIZE);
-        assertThat(captor.getValue().getSort()).isEqualTo(Sort.by("name").ascending());
+        assertThat(captor.getValue().getSort()).isEqualTo(Sort.by("name").ascending().and(Sort.by("id")));
         assertThat(result.getTotalElements()).isEqualTo(23);
         assertThat(result.getContent()).hasSize(1);
         verify(clubRepository, never()).findAll();
