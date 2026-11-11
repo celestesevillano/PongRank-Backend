@@ -4082,10 +4082,15 @@
               "path": [
                 "api",
                 "v1",
-                "clubs?page=0&size=10"
+                "clubs"
+              ],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "name", "value": "Miraflores", "disabled": true }
               ]
             },
-            "description": "Listado paginado de clubes aprobados."
+            "description": "Listado paginado de clubes aprobados. El parámetro opcional name busca coincidencias parciales sin distinguir mayúsculas."
           },
           "response": [
             {
@@ -4128,6 +4133,20 @@
               "body": "{\n  \"content\": [],\n  \"page\": 0,\n  \"size\": 10,\n  \"totalElements\": 0,\n  \"totalPages\": 0,\n  \"first\": true,\n  \"last\": true\n}"
             }
           ]
+        },
+        {
+          "name": "Clubes que administro",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/clubs/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "clubs", "me"]
+            },
+            "description": "Lista los clubes administrados por el usuario autenticado, incluyendo registros en revisión o rechazados."
+          },
+          "response": []
         },
         {
           "name": "Detalle de club",

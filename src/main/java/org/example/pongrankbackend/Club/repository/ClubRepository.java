@@ -8,11 +8,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface ClubRepository extends JpaRepository<Club, Long> {
 
     Page<Club> findByStatus(ClubStatus status, Pageable pageable);
+
+    Page<Club> findByStatusAndNameContainingIgnoreCase(ClubStatus status, String name, Pageable pageable);
+
+    List<Club> findByAdminIdOrderByUpdatedAtDesc(Long adminId);
 
     boolean existsByNameIgnoreCase(String name);
 

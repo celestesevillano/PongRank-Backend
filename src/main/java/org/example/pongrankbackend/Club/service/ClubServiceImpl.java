@@ -33,6 +33,8 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
+
 
 @Service
 @Transactional(readOnly = true)
@@ -96,10 +98,20 @@ public class ClubServiceImpl implements ClubService {
     }
 
     @Override
-    public PageResponseDTO<ClubResponseDTO> getApprovedClubs(int page, int size) {
-        return PageResponseDTO.from(
-                clubRepository.findByStatus(ClubStatus.APPROVED, PageRequestFactory.of(page, size, Sort.by("name").ascending())),
-                club -> modelMapper.map(club, ClubResponseDTO.class));
+    public PageResponseDTO<ClubResponseDTO> getApprovedClubs(String name, int page, int size) {
+        var pageable = PageRequestFactory.of(page, size, Sort.by("name").ascending().and(Sort.by("id")));
+        var clubs = name == null || name.isBlank()
+                ? clubRepository.findByStatus(ClubStatus.APPROVED, pageable)
+                : clubRepository.findByStatusAndNameContainingIgnoreCase(ClubStatus.APPROVED, name.strip(), pageable);
+        return PageResponseDTO.from(clubs, club -> modelMapper.map(club, ClubResponseDTO.class));
+    }
+
+    @Override
+    public List<ClubResponseDTO> getManagedClubs() {
+        return clubRepository.findByAdminIdOrderByUpdatedAtDesc(SecurityUtils.getRequiredCurrentUserId())
+                .stream()
+                .map(club -> modelMapper.map(club, ClubResponseDTO.class))
+                .toList();
     }
 
     @Override
