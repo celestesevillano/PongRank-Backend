@@ -65,7 +65,7 @@ class MatchFlowE2ETest {
                 .whatsapp("+51999111222")
                 .shareContact(true)
                 .categoryFdptm("Segunda")
-                .federatedDeclared(true)
+                .federatedDeclared(false)
                 .build();
 
         MvcResult juanRegisterResult = mockMvc.perform(post("/api/v1/auth/register")

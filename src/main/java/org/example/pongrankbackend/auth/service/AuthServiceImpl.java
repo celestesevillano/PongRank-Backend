@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.auth.service;
 
+import org.example.pongrankbackend.Federation.FederatedReviewService;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.PlayerStatus;
 import org.example.pongrankbackend.Player.Role;
@@ -46,6 +47,7 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final ApplicationEventPublisher eventPublisher;
     private final ModelMapper modelMapper;
+    private final FederatedReviewService federatedReviews;
 
     @Value("${app.frontend-url}")
     private String frontendUrl;
@@ -55,13 +57,15 @@ public class AuthServiceImpl implements AuthService {
                            PasswordEncoder passwordEncoder,
                            JwtService jwtService,
                            ApplicationEventPublisher eventPublisher,
-                           ModelMapper modelMapper) {
+                           ModelMapper modelMapper,
+                           FederatedReviewService federatedReviews) {
         this.playerRepository = playerRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.eventPublisher = eventPublisher;
         this.modelMapper = modelMapper;
+        this.federatedReviews = federatedReviews;
     }
 
     @Override
@@ -78,6 +82,10 @@ public class AuthServiceImpl implements AuthService {
             throw new ConflictException("El nombre de usuario '" + normalizedUsername + "' ya está en uso");
         }
 
+        boolean declaresFederation = Boolean.TRUE.equals(dto.getFederatedDeclared());
+        if (declaresFederation) {
+            federatedReviews.validateRegistration(dto);
+        }
         Player player = modelMapper.map(dto, Player.class);
         player.setEmail(normalizedEmail);
         player.setUsername(normalizedUsername);
@@ -96,6 +104,9 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Player savedPlayer = playerRepository.save(player);
+        if (declaresFederation) {
+            federatedReviews.submit(savedPlayer);
+        }
         eventPublisher.publishEvent(new PlayerRegisteredEvent(this, savedPlayer.getId()));
 
         CustomUserDetails userDetails = new CustomUserDetails(savedPlayer);
