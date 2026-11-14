@@ -1048,6 +1048,119 @@
           ]
         },
         {
+          "name": "Buscar jugadores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players?name=cam&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "cam"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Busca jugadores activos por nombre o usuario, sin distinguir mayúsculas. Requiere al menos 2 caracteres y excluye al jugador autenticado. Devuelve el resumen público paginado."
+          },
+          "response": [
+            {
+              "name": "Éxito (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/players?name=cam&page=0&size=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "players"
+                  ],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "cam"
+                    },
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"content\": [\n    {\n      \"id\": 8,\n      \"name\": \"Camila Rojas\",\n      \"username\": \"camila\",\n      \"ratingGlicko\": 1315.0,\n      \"categoryFdptm\": \"SEGUNDA\",\n      \"federatedDeclared\": false\n    }\n  ],\n  \"page\": 0,\n  \"size\": 10,\n  \"totalElements\": 1,\n  \"totalPages\": 1,\n  \"first\": true,\n  \"last\": true\n}"
+            },
+            {
+              "name": "Término muy corto (400)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/players?name=a",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "players"
+                  ],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "a"
+                    }
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"timestamp\": \"2026-11-14T18:00:00.000000000\",\n  \"status\": 400,\n  \"error\": \"Bad Request\",\n  \"message\": \"Escribe al menos 2 caracteres para buscar\",\n  \"path\": \"/api/v1/players\"\n}"
+            }
+          ]
+        },
+        {
           "name": "Actualizar perfil",
           "request": {
             "method": "PATCH",
@@ -1763,6 +1876,94 @@
               ],
               "cookie": [],
               "body": "{\n  \"timestamp\": \"2026-10-17T00:55:24.744986027\",\n  \"status\": 403,\n  \"error\": \"Forbidden\",\n  \"message\": \"Solo puedes consultar tus propias solicitudes de amistad pendientes\",\n  \"path\": \"/api/v1/friendships/players/2/pending\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Solicitudes enviadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/players/{{playerId}}/sent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "players",
+                "{{playerId}}",
+                "sent"
+              ]
+            },
+            "description": "Solicitudes enviadas que siguen sin respuesta (para mostrar «Enviadas» y cancelarlas con DELETE /friendships/{id}/cancel). Solo el propio jugador o un administrador pueden consultarlas."
+          },
+          "response": [
+            {
+              "name": "Éxito (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/friendships/players/1/sent",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "friendships",
+                    "players",
+                    "1",
+                    "sent"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n  {\n    \"id\": 9,\n    \"playerA\": {\n      \"id\": 1,\n      \"name\": \"Andrea Vidal\",\n      \"username\": \"andrea\",\n      \"ratingGlicko\": 1500.0,\n      \"categoryFdptm\": \"SEGUNDA\",\n      \"federatedDeclared\": false\n    },\n    \"playerB\": {\n      \"id\": 7,\n      \"name\": \"Lucía Vega\",\n      \"username\": \"lucia\",\n      \"ratingGlicko\": 1320.0,\n      \"categoryFdptm\": \"SEGUNDA\",\n      \"federatedDeclared\": false\n    },\n    \"status\": \"PENDING\",\n    \"createdAt\": \"2026-11-14T18:00:00.000000\",\n    \"updatedAt\": \"2026-11-14T18:00:00.000000\"\n  }\n]"
+            },
+            {
+              "name": "Ver solicitudes de otro jugador (403)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/friendships/players/2/sent",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "friendships",
+                    "players",
+                    "2",
+                    "sent"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"timestamp\": \"2026-11-14T18:00:00.000000000\",\n  \"status\": 403,\n  \"error\": \"Forbidden\",\n  \"message\": \"Solo puedes consultar tus propias solicitudes de amistad enviadas\",\n  \"path\": \"/api/v1/friendships/players/2/sent\"\n}"
             }
           ]
         }
@@ -4085,9 +4286,19 @@
                 "clubs"
               ],
               "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "10" },
-                { "key": "name", "value": "Miraflores", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "name",
+                  "value": "Miraflores",
+                  "disabled": true
+                }
               ]
             },
             "description": "Listado paginado de clubes aprobados. El parámetro opcional name busca coincidencias parciales sin distinguir mayúsculas."
@@ -4141,8 +4352,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clubs/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clubs", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "me"
+              ]
             },
             "description": "Lista los clubes administrados por el usuario autenticado, incluyendo registros en revisión o rechazados."
           },
