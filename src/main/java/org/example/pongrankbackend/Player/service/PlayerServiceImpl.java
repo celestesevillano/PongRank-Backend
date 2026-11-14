@@ -27,6 +27,10 @@ import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.service.AuthService;
 import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
 import org.example.pongrankbackend.common.exception.ConflictException;
+import org.example.pongrankbackend.common.exception.InvalidSearchException;
+import org.example.pongrankbackend.common.pagination.PageRequestFactory;
+import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.springframework.data.domain.Sort;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.security.PlayerAccessGuard;
@@ -114,6 +118,19 @@ public class PlayerServiceImpl implements PlayerService {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + id));
         return modelMapper.map(player, PlayerSummaryDTO.class);
+    }
+
+    @Override
+    public PageResponseDTO<PlayerSummaryDTO> searchPlayers(String query, int page, int size) {
+        // Se quitan los comodines de LIKE para que el término se busque tal cual
+        String term = query == null ? "" : query.replaceAll("[%_\\\\]", "").strip();
+        if (term.length() < 2) {
+            throw new InvalidSearchException("Escribe al menos 2 caracteres para buscar jugadores");
+        }
+        return PageResponseDTO.from(
+                playerRepository.search(PlayerStatus.ACTIVE, term,
+                        PageRequestFactory.of(page, size, Sort.by("name", "id"))),
+                player -> modelMapper.map(player, PlayerSummaryDTO.class));
     }
 
     @Override

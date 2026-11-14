@@ -84,4 +84,11 @@ public class FriendshipController {
         List<FriendshipResponseDTO> response = friendshipService.getPendingRequests(playerId);
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/players/{playerId}/sent")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<FriendshipResponseDTO>> getSentRequests(
+            @PathVariable Long playerId) {
+        return ResponseEntity.ok(friendshipService.getSentRequests(playerId));
+    }
 }

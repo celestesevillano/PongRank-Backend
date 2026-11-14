@@ -596,4 +596,40 @@ class FriendshipServiceImplTest {
 
         verify(friendshipRepository, never()).delete(any());
     }
+
+    @Test
+    @DisplayName("getSentRequests: devuelve las solicitudes pendientes que envió el jugador")
+    void getSentRequests_ReturnsPendingSentByPlayer() {
+        Friendship sent = Friendship.builder().id(7L).status(FriendshipStatus.PENDING).build();
+        FriendshipResponseDTO dto = FriendshipResponseDTO.builder().id(7L).status(FriendshipStatus.PENDING).build();
+        when(playerRepository.existsById(3L)).thenReturn(true);
+        when(friendshipRepository.findByPlayerAIdAndStatus(3L, FriendshipStatus.PENDING)).thenReturn(List.of(sent));
+        when(modelMapper.map(sent, FriendshipResponseDTO.class)).thenReturn(dto);
+
+        List<FriendshipResponseDTO> result = friendshipService.getSentRequests(3L);
+
+        assertThat(result).containsExactly(dto);
+        verify(playerAccessGuard).requireSelfOrAdmin(eq(3L), anyString());
+    }
+
+    @Test
+    @DisplayName("getSentRequests: otro jugador no puede ver mis solicitudes enviadas")
+    void getSentRequests_OtherPlayer_ThrowsUnauthorized() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(3L), anyString());
+
+        assertThatThrownBy(() -> friendshipService.getSentRequests(3L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verify(friendshipRepository, never()).findByPlayerAIdAndStatus(any(), any());
+    }
+
+    @Test
+    @DisplayName("getSentRequests: jugador inexistente lanza ResourceNotFoundException")
+    void getSentRequests_PlayerNotFound_ThrowsException() {
+        when(playerRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> friendshipService.getSentRequests(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
 }

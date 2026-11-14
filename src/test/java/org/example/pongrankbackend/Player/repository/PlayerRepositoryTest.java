@@ -97,4 +97,23 @@ class PlayerRepositoryTest {
             playerRepository.saveAndFlush(duplicate);
         }).isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    @DisplayName("search - Encuentra por nombre o usuario sin distinguir mayúsculas y solo jugadores activos")
+    void search_MatchesNameOrUsernameCaseInsensitiveAndOnlyActive() {
+        Player byUsername = Player.builder().name("Lucía Vega").username("la.paleta").email("lucia@pongrank.com")
+                .password("$2a$10$encodedPasswordHashHere12345").ratingGlicko(1500.0).ratingDeviation(200.0)
+                .volatility(0.059).role(Role.ROLE_USER).status(PlayerStatus.ACTIVE).build();
+        Player deleted = Player.builder().name("Mateo Borrado").email("borrado@pongrank.com")
+                .password("$2a$10$encodedPasswordHashHere12345").ratingGlicko(1500.0).ratingDeviation(200.0)
+                .volatility(0.059).role(Role.ROLE_USER).status(PlayerStatus.DELETED).build();
+        entityManager.persistAndFlush(byUsername);
+        entityManager.persistAndFlush(deleted);
+
+        var byName = playerRepository.search(PlayerStatus.ACTIVE, "MATEO", org.springframework.data.domain.PageRequest.of(0, 10));
+        var byUser = playerRepository.search(PlayerStatus.ACTIVE, "paleta", org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertThat(byName.getContent()).extracting(Player::getName).containsExactly("Mateo Torres");
+        assertThat(byUser.getContent()).extracting(Player::getName).containsExactly("Lucía Vega");
+    }
 }

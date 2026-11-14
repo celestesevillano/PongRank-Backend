@@ -27,4 +27,7 @@ public interface FriendshipRepository extends JpaRepository<Friendship, Long> {
     List<Friendship> findAllByPlayerIdAndStatus(@Param("playerId") Long playerId, @Param("status") FriendshipStatus status);
 
     List<Friendship> findByPlayerBIdAndStatus(Long playerBId, FriendshipStatus status);
+
+    // playerA es siempre quien envió la solicitud
+    List<Friendship> findByPlayerAIdAndStatus(Long playerAId, FriendshipStatus status);
 }

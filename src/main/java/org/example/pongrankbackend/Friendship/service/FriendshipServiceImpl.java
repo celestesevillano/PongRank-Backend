@@ -188,4 +188,17 @@ public class FriendshipServiceImpl implements FriendshipService {
                 .map(friendship -> modelMapper.map(friendship, FriendshipResponseDTO.class))
                 .toList();
     }
+
+    @Override
+    public List<FriendshipResponseDTO> getSentRequests(Long playerId) {
+        playerAccessGuard.requireSelfOrAdmin(playerId,
+                "Solo puedes consultar tus propias solicitudes de amistad enviadas");
+        if (!playerRepository.existsById(playerId)) {
+            throw new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId);
+        }
+
+        return friendshipRepository.findByPlayerAIdAndStatus(playerId, FriendshipStatus.PENDING).stream()
+                .map(friendship -> modelMapper.map(friendship, FriendshipResponseDTO.class))
+                .toList();
+    }
 }

@@ -1289,6 +1289,84 @@
               "body": "{\n  \"timestamp\": \"2026-10-17T00:56:08.5986244\",\n  \"status\": 401,\n  \"error\": \"Unauthorized\",\n  \"message\": \"La contraseña ingresada no es correcta\",\n  \"path\": \"/api/v1/players/me\"\n}"
             }
           ]
+        },
+        {
+          "name": "Buscar jugadores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/players?name=bruno&page=0&size=10",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "players"
+              ],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "bruno"
+                },
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Busca jugadores activos por nombre o nombre de usuario (sin distinguir mayúsculas, mínimo 2 caracteres, paginado). El WhatsApp solo aparece si el jugador lo comparte."
+          },
+          "response": [
+            {
+              "name": "Éxito (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/players?name=bruno&page=0&size=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "players"
+                  ],
+                  "query": [
+                    {
+                      "key": "name",
+                      "value": "bruno"
+                    },
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"content\": [\n    {\n      \"id\": 2,\n      \"name\": \"Bruno Rojas\",\n      \"username\": \"bruno.tt\",\n      \"ratingGlicko\": 1337.7,\n      \"categoryFdptm\": \"PRIMERA\",\n      \"federatedDeclared\": false,\n      \"whatsapp\": null\n    }\n  ],\n  \"page\": 0,\n  \"size\": 10,\n  \"totalElements\": 1,\n  \"totalPages\": 1,\n  \"first\": true,\n  \"last\": true\n}"
+            }
+          ]
         }
       ]
     },
@@ -1763,6 +1841,62 @@
               ],
               "cookie": [],
               "body": "{\n  \"timestamp\": \"2026-10-17T00:55:24.744986027\",\n  \"status\": 403,\n  \"error\": \"Forbidden\",\n  \"message\": \"Solo puedes consultar tus propias solicitudes de amistad pendientes\",\n  \"path\": \"/api/v1/friendships/players/2/pending\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Solicitudes enviadas pendientes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/friendships/players/{{playerId}}/sent",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "friendships",
+                "players",
+                "{{playerId}}",
+                "sent"
+              ]
+            },
+            "description": "Solicitudes de amistad que el jugador envió y aún no tienen respuesta. Solo el propio jugador o un admin. Quien la envió puede cancelarla con 'Cancelar solicitud'."
+          },
+          "response": [
+            {
+              "name": "Éxito (200)",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/v1/friendships/players/{{playerId}}/sent",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "friendships",
+                    "players",
+                    "{{playerId}}",
+                    "sent"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n  {\n    \"id\": 4,\n    \"playerA\": {\n      \"id\": 1,\n      \"name\": \"Andrea Vidal\",\n      \"username\": \"andrea.tt\",\n      \"ratingGlicko\": 1662.3,\n      \"categoryFdptm\": \"PRIMERA\",\n      \"federatedDeclared\": true,\n      \"whatsapp\": null\n    },\n    \"playerB\": {\n      \"id\": 2,\n      \"name\": \"Bruno Rojas\",\n      \"username\": \"bruno.tt\",\n      \"ratingGlicko\": 1337.7,\n      \"categoryFdptm\": \"PRIMERA\",\n      \"federatedDeclared\": false,\n      \"whatsapp\": null\n    },\n    \"status\": \"PENDING\",\n    \"createdAt\": \"2026-11-14T10:00:00\",\n    \"updatedAt\": \"2026-11-14T10:00:00\"\n  }\n]"
             }
           ]
         }
@@ -4085,9 +4219,19 @@
                 "clubs"
               ],
               "query": [
-                { "key": "page", "value": "0" },
-                { "key": "size", "value": "10" },
-                { "key": "name", "value": "Miraflores", "disabled": true }
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                },
+                {
+                  "key": "name",
+                  "value": "Miraflores",
+                  "disabled": true
+                }
               ]
             },
             "description": "Listado paginado de clubes aprobados. El parámetro opcional name busca coincidencias parciales sin distinguir mayúsculas."
@@ -4141,8 +4285,15 @@
             "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/v1/clubs/me",
-              "host": ["{{baseUrl}}"],
-              "path": ["api", "v1", "clubs", "me"]
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "clubs",
+                "me"
+              ]
             },
             "description": "Lista los clubes administrados por el usuario autenticado, incluyendo registros en revisión o rechazados."
           },

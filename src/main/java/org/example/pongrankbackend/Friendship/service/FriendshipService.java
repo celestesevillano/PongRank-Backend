@@ -22,4 +22,6 @@ public interface FriendshipService {
     List<FriendshipResponseDTO> getAcceptedFriends(Long playerId);
 
     List<FriendshipResponseDTO> getPendingRequests(Long playerId);
+
+    List<FriendshipResponseDTO> getSentRequests(Long playerId);
 }

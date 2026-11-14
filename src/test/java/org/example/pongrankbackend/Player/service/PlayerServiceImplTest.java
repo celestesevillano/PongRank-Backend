@@ -506,4 +506,32 @@ class PlayerServiceImplTest {
         assertThat(captor.getValue().getPlan()).isEqualTo(MembershipPlan.PRO);
         verify(playerRepository).save(player);
     }
+
+    @Test
+    @DisplayName("searchPlayers: busca solo jugadores activos y limpia los comodines del término")
+    void searchPlayers_StripsWildcardsAndSearchesActivePlayers() {
+        Player player = Player.builder().id(5L).name("Mateo Torres").status(PlayerStatus.ACTIVE).build();
+        PlayerSummaryDTO summary = PlayerSummaryDTO.builder().id(5L).name("Mateo Torres").build();
+        when(playerRepository.search(eq(PlayerStatus.ACTIVE), eq("mat"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(player)));
+        when(modelMapper.map(player, PlayerSummaryDTO.class)).thenReturn(summary);
+
+        var result = playerService.searchPlayers("  %m_at  ", 0, 10);
+
+        assertThat(result.getContent()).containsExactly(summary);
+        assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("searchPlayers: un término de menos de 2 caracteres devuelve error 400")
+    void searchPlayers_TermTooShort_ThrowsInvalidSearch() {
+        assertThatThrownBy(() -> playerService.searchPlayers(" a ", 0, 10))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.InvalidSearchException.class);
+        assertThatThrownBy(() -> playerService.searchPlayers("%_", 0, 10))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.InvalidSearchException.class);
+        assertThatThrownBy(() -> playerService.searchPlayers(null, 0, 10))
+                .isInstanceOf(org.example.pongrankbackend.common.exception.InvalidSearchException.class);
+
+        verify(playerRepository, never()).search(any(), any(), any());
+    }
 }

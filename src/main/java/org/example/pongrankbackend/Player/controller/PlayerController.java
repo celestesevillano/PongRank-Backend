@@ -1,6 +1,8 @@
 package org.example.pongrankbackend.Player.controller;
 
 import jakarta.validation.Valid;
+import org.example.pongrankbackend.common.pagination.PageRequestFactory;
+import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.example.pongrankbackend.Player.dto.CategorySuggestionRequestDTO;
 import org.example.pongrankbackend.Player.dto.CategorySuggestionResponseDTO;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
@@ -42,6 +44,14 @@ public class PlayerController {
     public ResponseEntity<CategorySuggestionResponseDTO> suggestCategory(
             @Valid @RequestBody CategorySuggestionRequestDTO dto) {
         return ResponseEntity.ok(playerService.suggestCategory(dto));
+    }
+
+    @GetMapping
+    public ResponseEntity<PageResponseDTO<PlayerSummaryDTO>> searchPlayers(
+            @RequestParam String name,
+            @RequestParam(defaultValue = PageRequestFactory.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = PageRequestFactory.DEFAULT_SIZE) int size) {
+        return ResponseEntity.ok(playerService.searchPlayers(name, page, size));
     }
 
     @GetMapping("/{playerId}")
