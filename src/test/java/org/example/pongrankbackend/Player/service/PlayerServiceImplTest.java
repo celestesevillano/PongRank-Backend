@@ -536,4 +536,16 @@ class PlayerServiceImplTest {
 
         verify(playerRepository, never()).searchByNameOrUsername(any(), any(), any(), any());
     }
+
+    @Test
+    @DisplayName("searchPlayers: escapa los comodines % y _ para buscarlos como texto")
+    void searchPlayers_EscapesLikeWildcards() {
+        actingAs(5L);
+        when(playerRepository.searchByNameOrUsername(eq("a!%b!_c!!"), eq(PlayerStatus.ACTIVE), eq(5L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of()));
+
+        PageResponseDTO<PlayerSummaryDTO> result = playerService.searchPlayers("a%b_c!", 0, 10);
+
+        assertThat(result.getContent()).isEmpty();
+    }
 }
