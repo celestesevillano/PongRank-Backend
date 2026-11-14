@@ -1,6 +1,9 @@
 package org.example.pongrankbackend.Player.repository;
 
 import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Player.PlayerStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -24,4 +27,12 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     boolean existsByUsername(String username);
 
     boolean existsByUsernameAndIdNot(String username, Long id);
+
+    @Query("SELECT p FROM Player p WHERE p.status = :status AND p.id <> :excludedId " +
+           "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :term, '%')) " +
+           "OR LOWER(p.username) LIKE LOWER(CONCAT('%', :term, '%')))")
+    Page<Player> searchByNameOrUsername(@Param("term") String term,
+                                        @Param("status") PlayerStatus status,
+                                        @Param("excludedId") Long excludedId,
+                                        Pageable pageable);
 }

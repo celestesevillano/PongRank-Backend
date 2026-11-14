@@ -1,5 +1,8 @@
 package org.example.pongrankbackend.Player.service;
 
+import org.example.pongrankbackend.common.exception.InvalidSearchTermException;
+import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.springframework.data.domain.Pageable;
 import org.example.pongrankbackend.Club.ClubStatus;
 import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.ClubMembership.ClubMembership;
@@ -505,5 +508,32 @@ class PlayerServiceImplTest {
         assertThat(captor.getValue().getPlayerEmail()).isEqualTo("carlos@domain.com");
         assertThat(captor.getValue().getPlan()).isEqualTo(MembershipPlan.PRO);
         verify(playerRepository).save(player);
+    }
+
+    @Test
+    @DisplayName("searchPlayers: busca activos por nombre o usuario excluyendo al jugador autenticado")
+    void searchPlayers_ReturnsPageOfSummaries() {
+        actingAs(5L);
+        Player found = Player.builder().id(8L).name("Camila Rojas").build();
+        PlayerSummaryDTO summary = PlayerSummaryDTO.builder().id(8L).name("Camila Rojas").build();
+        when(playerRepository.searchByNameOrUsername(eq("cam"), eq(PlayerStatus.ACTIVE), eq(5L), any(Pageable.class)))
+                .thenReturn(new PageImpl<>(List.of(found)));
+        when(modelMapper.map(found, PlayerSummaryDTO.class)).thenReturn(summary);
+
+        PageResponseDTO<PlayerSummaryDTO> result = playerService.searchPlayers("  cam ", 0, 10);
+
+        assertThat(result.getContent()).containsExactly(summary);
+        assertThat(result.getTotalElements()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("searchPlayers: rechaza términos de menos de 2 caracteres")
+    void searchPlayers_TermTooShort_Throws() {
+        actingAs(5L);
+
+        assertThatThrownBy(() -> playerService.searchPlayers(" a ", 0, 10))
+                .isInstanceOf(InvalidSearchTermException.class);
+
+        verify(playerRepository, never()).searchByNameOrUsername(any(), any(), any(), any());
     }
 }

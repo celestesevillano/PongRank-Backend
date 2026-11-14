@@ -596,4 +596,45 @@ class FriendshipServiceImplTest {
 
         verify(friendshipRepository, never()).delete(any());
     }
+
+    @Test
+    @DisplayName("getSentRequests: devuelve solicitudes enviadas por el jugador en estado PENDING")
+    void getSentRequests_Success() {
+        Long playerId = 2L;
+        Friendship f1 = Friendship.builder().id(100L).status(FriendshipStatus.PENDING).build();
+        FriendshipResponseDTO dto1 = FriendshipResponseDTO.builder().id(100L).status(FriendshipStatus.PENDING).build();
+
+        when(playerRepository.existsById(playerId)).thenReturn(true);
+        when(friendshipRepository.findByPlayerAIdAndStatus(playerId, FriendshipStatus.PENDING)).thenReturn(List.of(f1));
+        when(modelMapper.map(f1, FriendshipResponseDTO.class)).thenReturn(dto1);
+
+        List<FriendshipResponseDTO> result = friendshipService.getSentRequests(playerId);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getId()).isEqualTo(100L);
+        verify(friendshipRepository).findByPlayerAIdAndStatus(playerId, FriendshipStatus.PENDING);
+    }
+
+    @Test
+    @DisplayName("getSentRequests: lanza UnauthorizedActionException si el guard deniega el acceso")
+    void getSentRequests_AccessDenied_ThrowsException() {
+        doThrow(new UnauthorizedActionException("denegado"))
+                .when(playerAccessGuard).requireSelfOrAdmin(eq(7L), anyString());
+
+        assertThatThrownBy(() -> friendshipService.getSentRequests(7L))
+                .isInstanceOf(UnauthorizedActionException.class);
+
+        verifyNoInteractions(friendshipRepository);
+    }
+
+    @Test
+    @DisplayName("getSentRequests: lanza ResourceNotFoundException si el jugador no existe")
+    void getSentRequests_PlayerNotFound_ThrowsException() {
+        when(playerRepository.existsById(9L)).thenReturn(false);
+
+        assertThatThrownBy(() -> friendshipService.getSentRequests(9L))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(friendshipRepository);
+    }
 }

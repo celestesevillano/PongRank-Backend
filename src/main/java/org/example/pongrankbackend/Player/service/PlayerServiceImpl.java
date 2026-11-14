@@ -28,6 +28,11 @@ import org.example.pongrankbackend.auth.service.AuthService;
 import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.InvalidCredentialsException;
+import org.example.pongrankbackend.common.exception.InvalidSearchTermException;
+import org.example.pongrankbackend.common.pagination.PageRequestFactory;
+import org.example.pongrankbackend.common.pagination.PageResponseDTO;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.example.pongrankbackend.security.SecurityUtils;
@@ -46,6 +51,8 @@ import java.util.Locale;
 @Service
 @Transactional(readOnly = true)
 public class PlayerServiceImpl implements PlayerService {
+
+    private static final int MIN_SEARCH_LENGTH = 2;
 
     private final PlayerRepository playerRepository;
     private final ClubRepository clubRepository;
@@ -114,6 +121,18 @@ public class PlayerServiceImpl implements PlayerService {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + id));
         return modelMapper.map(player, PlayerSummaryDTO.class);
+    }
+
+    @Override
+    public PageResponseDTO<PlayerSummaryDTO> searchPlayers(String name, int page, int size) {
+        String term = name == null ? "" : name.strip();
+        if (term.length() < MIN_SEARCH_LENGTH) {
+            throw new InvalidSearchTermException("Escribe al menos " + MIN_SEARCH_LENGTH + " caracteres para buscar");
+        }
+        Long currentUserId = SecurityUtils.getRequiredCurrentUserId();
+        Page<Player> players = playerRepository.searchByNameOrUsername(term, PlayerStatus.ACTIVE, currentUserId,
+                PageRequestFactory.of(page, size, Sort.by("name").ascending().and(Sort.by("id"))));
+        return PageResponseDTO.from(players, player -> modelMapper.map(player, PlayerSummaryDTO.class));
     }
 
     @Override

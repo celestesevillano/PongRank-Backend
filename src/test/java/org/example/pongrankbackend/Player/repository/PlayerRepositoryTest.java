@@ -97,4 +97,26 @@ class PlayerRepositoryTest {
             playerRepository.saveAndFlush(duplicate);
         }).isInstanceOf(DataIntegrityViolationException.class);
     }
+
+    @Test
+    @DisplayName("searchByNameOrUsername - Encuentra activos por nombre sin distinguir mayúsculas y excluye al indicado")
+    void searchByNameOrUsername_MatchesNameCaseInsensitive() {
+        Player other = entityManager.persistAndFlush(Player.builder()
+                .name("Mateo Rivas").username("mrivas").email("rivas@pongrank.com")
+                .password("Password999").role(Role.ROLE_USER).status(PlayerStatus.ACTIVE).build());
+        entityManager.persistAndFlush(Player.builder()
+                .name("Mateo Borrado").email("borrado@pongrank.com")
+                .password("Password999").role(Role.ROLE_USER).status(PlayerStatus.DELETED).build());
+
+        var all = playerRepository.searchByNameOrUsername("MATEO", PlayerStatus.ACTIVE, -1L,
+                org.springframework.data.domain.PageRequest.of(0, 10));
+        var withoutSelf = playerRepository.searchByNameOrUsername("mateo", PlayerStatus.ACTIVE, savedPlayer.getId(),
+                org.springframework.data.domain.PageRequest.of(0, 10));
+        var byUsername = playerRepository.searchByNameOrUsername("mriv", PlayerStatus.ACTIVE, -1L,
+                org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertThat(all.getContent()).extracting(Player::getName).containsExactlyInAnyOrder("Mateo Torres", "Mateo Rivas");
+        assertThat(withoutSelf.getContent()).extracting(Player::getId).containsExactly(other.getId());
+        assertThat(byUsername.getContent()).extracting(Player::getId).containsExactly(other.getId());
+    }
 }
