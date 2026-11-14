@@ -28,9 +28,10 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
 
     boolean existsByUsernameAndIdNot(String username, Long id);
 
+    // :term llega con %, _ y ! escapados con "!" (ver PlayerServiceImpl.escapeLikeTerm)
     @Query("SELECT p FROM Player p WHERE p.status = :status AND p.id <> :excludedId " +
-           "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :term, '%')) " +
-           "OR LOWER(p.username) LIKE LOWER(CONCAT('%', :term, '%')))")
+           "AND (LOWER(p.name) LIKE LOWER(CONCAT('%', :term, '%')) ESCAPE '!' " +
+           "OR LOWER(p.username) LIKE LOWER(CONCAT('%', :term, '%')) ESCAPE '!')")
     Page<Player> searchByNameOrUsername(@Param("term") String term,
                                         @Param("status") PlayerStatus status,
                                         @Param("excludedId") Long excludedId,

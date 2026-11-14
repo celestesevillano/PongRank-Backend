@@ -119,4 +119,20 @@ class PlayerRepositoryTest {
         assertThat(withoutSelf.getContent()).extracting(Player::getId).containsExactly(other.getId());
         assertThat(byUsername.getContent()).extracting(Player::getId).containsExactly(other.getId());
     }
+
+    @Test
+    @DisplayName("searchByNameOrUsername - Un término con comodín escapado no coincide con todo")
+    void searchByNameOrUsername_EscapedWildcardIsLiteral() {
+        entityManager.persistAndFlush(Player.builder()
+                .name("Ana_Perez").email("ana@pongrank.com")
+                .password("Password999").role(Role.ROLE_USER).status(PlayerStatus.ACTIVE).build());
+
+        var literal = playerRepository.searchByNameOrUsername("a!_p", PlayerStatus.ACTIVE, -1L,
+                org.springframework.data.domain.PageRequest.of(0, 10));
+        var notAWildcard = playerRepository.searchByNameOrUsername("o!_t", PlayerStatus.ACTIVE, -1L,
+                org.springframework.data.domain.PageRequest.of(0, 10));
+
+        assertThat(literal.getContent()).extracting(Player::getName).containsExactly("Ana_Perez");
+        assertThat(notAWildcard.getContent()).isEmpty();
+    }
 }

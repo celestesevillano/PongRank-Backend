@@ -130,9 +130,14 @@ public class PlayerServiceImpl implements PlayerService {
             throw new InvalidSearchTermException("Escribe al menos " + MIN_SEARCH_LENGTH + " caracteres para buscar");
         }
         Long currentUserId = SecurityUtils.getRequiredCurrentUserId();
-        Page<Player> players = playerRepository.searchByNameOrUsername(term, PlayerStatus.ACTIVE, currentUserId,
+        Page<Player> players = playerRepository.searchByNameOrUsername(escapeLikeTerm(term), PlayerStatus.ACTIVE, currentUserId,
                 PageRequestFactory.of(page, size, Sort.by("name").ascending().and(Sort.by("id"))));
         return PageResponseDTO.from(players, player -> modelMapper.map(player, PlayerSummaryDTO.class));
+    }
+
+    // Los comodines de LIKE escritos por el usuario se buscan como texto literal
+    private static String escapeLikeTerm(String term) {
+        return term.replace("!", "!!").replace("%", "!%").replace("_", "!_");
     }
 
     @Override
