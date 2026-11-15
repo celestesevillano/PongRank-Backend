@@ -288,7 +288,7 @@ class PlayerServiceImplTest {
     void getPlayerById_NotFound_ThrowsException() {
         // Arrange
         Long playerId = 99L;
-        when(playerRepository.lockForUpdate(playerId)).thenReturn(Optional.empty());
+        when(playerRepository.findById(playerId)).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThatThrownBy(() -> playerService.getPlayerById(playerId))
@@ -306,7 +306,7 @@ class PlayerServiceImplTest {
         Player player = Player.builder().id(playerId).name("Carlos Gomez").ratingGlicko(1500.0).build();
         PlayerSummaryDTO summaryDto = PlayerSummaryDTO.builder().id(playerId).name("Carlos Gomez").ratingGlicko(1500.0).build();
 
-        when(playerRepository.lockForUpdate(playerId)).thenReturn(Optional.of(player));
+        when(playerRepository.findById(playerId)).thenReturn(Optional.of(player));
         when(modelMapper.map(player, PlayerSummaryDTO.class)).thenReturn(summaryDto);
 
         // Act
