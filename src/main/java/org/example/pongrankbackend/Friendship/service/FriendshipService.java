@@ -2,6 +2,9 @@ package org.example.pongrankbackend.Friendship.service;
 
 import org.example.pongrankbackend.Friendship.dto.FriendshipRequestDTO;
 import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
+import org.example.pongrankbackend.Friendship.dto.PongmigosProfileDTO;
+import org.example.pongrankbackend.Friendship.dto.PongmigosVisibilityDTO;
+import org.example.pongrankbackend.Player.PongmigosVisibility;
 
 import java.util.List;
 
@@ -25,4 +28,10 @@ public interface FriendshipService {
 
     // Solicitudes que el jugador envió y siguen sin respuesta
     List<FriendshipResponseDTO> getSentRequests(Long playerId);
+
+    PongmigosVisibilityDTO getPongmigosVisibility(Long playerId);
+
+    PongmigosVisibilityDTO updatePongmigosVisibility(Long playerId, PongmigosVisibility visibility);
+
+    PongmigosProfileDTO getPongmigosProfile(Long playerId, Long viewerId, int page, int size);
 }

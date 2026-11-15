@@ -3,8 +3,12 @@ package org.example.pongrankbackend.Friendship.controller;
 import jakarta.validation.Valid;
 import org.example.pongrankbackend.Friendship.dto.FriendshipRequestDTO;
 import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
+import org.example.pongrankbackend.Friendship.dto.PongmigosProfileDTO;
+import org.example.pongrankbackend.Friendship.dto.PongmigosVisibilityDTO;
 import org.example.pongrankbackend.Friendship.service.FriendshipService;
+import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.security.CustomUserDetails;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -91,5 +95,33 @@ public class FriendshipController {
             @PathVariable Long playerId) {
         List<FriendshipResponseDTO> response = friendshipService.getSentRequests(playerId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me/visibility")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PongmigosVisibilityDTO> getVisibility(
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(friendshipService.getPongmigosVisibility(currentUser.getId()));
+    }
+
+    @PatchMapping("/me/visibility")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PongmigosVisibilityDTO> updateVisibility(
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @Valid @RequestBody PongmigosVisibilityDTO dto) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(friendshipService.updatePongmigosVisibility(currentUser.getId(), dto.visibility()));
+    }
+
+    @GetMapping("/players/{playerId}/public-list")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<PongmigosProfileDTO> getPublicList(
+            @PathVariable Long playerId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @RequestParam(defaultValue = PageRequestFactory.DEFAULT_PAGE) int page,
+            @RequestParam(defaultValue = PageRequestFactory.DEFAULT_SIZE) int size) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(friendshipService.getPongmigosProfile(playerId, currentUser.getId(), page, size));
     }
 }
