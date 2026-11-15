@@ -2289,6 +2289,63 @@
           ]
         },
         {
+          "name": "Candidatos para transferir administración",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/administration-candidates",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "administration-candidates"
+              ]
+            },
+            "description": "Devuelve miembros activos y si cumplen las condiciones para administrar."
+          },
+          "response": []
+        },
+        {
+          "name": "Transferir administración",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/communities/{{communityId}}/transfer-administration",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "communities",
+                "{{communityId}}",
+                "transfer-administration"
+              ]
+            },
+            "description": "Requiere que quien solicita sea la persona responsable. Disponible hasta 24 horas después del vencimiento.",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"playerId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Actualizar comunidad",
           "request": {
             "method": "PUT",
@@ -2310,7 +2367,7 @@
                 "{{communityId}}"
               ]
             },
-            "description": "Requiere membresía activa con rol COMMUNITY_ADMIN.",
+            "description": "Requiere membresía activa con rol COMMUNITY_ADMIN. communityType y customLabel son opcionales. Envía una etiqueta si eliges OTHER. Los tipos predefinidos limpian la etiqueta anterior. Omitir ambos campos conserva el tipo y la etiqueta actuales.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"name\": \"UTEC Tenis de Mesa\",\n  \"description\": \"Descripción actualizada\"\n}",

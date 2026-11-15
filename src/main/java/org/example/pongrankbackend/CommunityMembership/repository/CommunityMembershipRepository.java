@@ -29,8 +29,28 @@ public interface CommunityMembershipRepository extends JpaRepository<CommunityMe
 
     long countByCommunityIdAndStatus(Long communityId, MembershipStatus status);
 
+    @Query("""
+            SELECT COUNT(m) FROM CommunityMembership m
+            WHERE m.player.id = :playerId AND m.status = :status
+              AND (m.community.status = :communityStatus
+                   OR (m.community.status = ARCHIVED AND m.community.planExpiresAt IS NOT NULL))
+            """)
     long countByPlayerIdAndStatusAndCommunityStatus(
-            Long playerId, MembershipStatus status, CommunityStatus communityStatus);
+            @Param("playerId") Long playerId, @Param("status") MembershipStatus status,
+            @Param("communityStatus") CommunityStatus communityStatus);
+
+    @Query(value = """
+            SELECT m FROM CommunityMembership m JOIN FETCH m.player p
+            WHERE m.community.id = :communityId AND m.status = :status AND p.id <> :requesterId
+            ORDER BY p.name, p.id
+            """,
+            countQuery = """
+            SELECT COUNT(m) FROM CommunityMembership m
+            WHERE m.community.id = :communityId AND m.status = :status AND m.player.id <> :requesterId
+            """)
+    Page<CommunityMembership> findAdministrationCandidates(
+            @Param("communityId") Long communityId, @Param("status") MembershipStatus status,
+            @Param("requesterId") Long requesterId, Pageable pageable);
 
     @Query(value = """
             SELECT m FROM CommunityMembership m

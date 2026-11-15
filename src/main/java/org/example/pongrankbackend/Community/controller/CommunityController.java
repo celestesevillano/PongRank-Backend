@@ -3,9 +3,11 @@ package org.example.pongrankbackend.Community.controller;
 import jakarta.validation.Valid;
 import org.example.pongrankbackend.Community.CommunityType;
 import org.example.pongrankbackend.Community.dto.CommunityCreateRequestDTO;
+import org.example.pongrankbackend.Community.dto.CommunityAdministrationCandidateDTO;
 import org.example.pongrankbackend.Community.dto.CommunityDetailResponseDTO;
 import org.example.pongrankbackend.Community.dto.CommunityResponseDTO;
 import org.example.pongrankbackend.Community.dto.CommunityUpdateRequestDTO;
+import org.example.pongrankbackend.Community.dto.CommunityTransferRequestDTO;
 import org.example.pongrankbackend.Community.service.CommunityService;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberAddRequestDTO;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberResponseDTO;
@@ -59,8 +61,10 @@ public class CommunityController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<List<CommunityResponseDTO>> getMyCommunities(@AuthenticationPrincipal CustomUserDetails currentUser) {
-        return ResponseEntity.ok(communityService.getMyCommunities(currentUser.getId()));
+    public ResponseEntity<List<CommunityResponseDTO>> getMyCommunities(@AuthenticationPrincipal CustomUserDetails currentUser,
+                                                                      @RequestParam(defaultValue = "false") boolean includeClosed) {
+        return ResponseEntity.ok(includeClosed ? communityService.getMyCommunitiesIncludingClosed(currentUser.getId())
+                : communityService.getMyCommunities(currentUser.getId()));
     }
 
     @GetMapping("/{communityId}")
@@ -76,6 +80,23 @@ public class CommunityController {
             @AuthenticationPrincipal CustomUserDetails currentUser,
             @Valid @RequestBody CommunityUpdateRequestDTO dto) {
         return ResponseEntity.ok(communityService.updateCommunity(communityId, dto, currentUser.getId()));
+    }
+
+    @GetMapping("/{communityId}/administration-candidates")
+    public ResponseEntity<Page<CommunityAdministrationCandidateDTO>> getAdministrationCandidates(
+            @PathVariable Long communityId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(communityService.getAdministrationCandidates(communityId, currentUser.getId(), pageable));
+    }
+
+    @PostMapping("/{communityId}/transfer-administration")
+    public ResponseEntity<Void> transferAdministration(
+            @PathVariable Long communityId,
+            @AuthenticationPrincipal CustomUserDetails currentUser,
+            @Valid @RequestBody CommunityTransferRequestDTO dto) {
+        communityService.transferAdministration(communityId, dto.playerId(), currentUser.getId());
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/{communityId}")

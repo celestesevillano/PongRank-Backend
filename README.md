@@ -98,7 +98,11 @@ erDiagram
 
 ### Decisiones de Diseño
 
-**Borrado lógico.** Las comunidades pasan a `ARCHIVED`: `Match` guarda `community_id` y un borrado real dejaría huérfano el historial que alimenta los ratings.
+**Ciclo de vida de Comunidades.** Cuando vence el plan de la persona responsable, la comunidad pasa a `GRACE` por 24 horas. En ese plazo la administración puede renovar o transferir la responsabilidad a un miembro activo con plan de pago y cupo administrativo. Transcurrido el plazo, la comunidad pasa a `ARCHIVED` por tres días y puede reactivarse con una renovación. Los espacios y el nombre quedan reservados durante el archivado. Una comunidad pasa a `DELETED` cuando acaba el plazo de reactivación o cuando un administrador confirma la eliminación. El estado definitivo libera los espacios y conserva el historial de partidas.
+
+El detalle devuelve `lifecyclePhase` y las fechas de la etapa. La persona responsable también recibe `planExpiresAt`, que permite mostrar el aviso durante los tres días previos. Las vistas cerradas se pueden recuperar mediante `GET /api/v1/communities/me?includeClosed=true` y el detalle conserva el rol de quien consulta. Los endpoints para elegir y transferir están en `/{communityId}/administration-candidates` y `/{communityId}/transfer-administration`. La transferencia se revalida al confirmar.
+
+Para una base PostgreSQL existente, aplica `scripts/db/community-lifecycle.sql` antes de desplegar este cambio. El script conserva las comunidades ya cerradas como definitivas y asigna la responsabilidad a un administrador activo en las comunidades existentes.
 
 **Autorización por membresía, no por creador.** Los permisos se verifican contra una membresía activa con rol `COMMUNITY_ADMIN`, nunca contra `creator`: quien transfiere la administración debe perder privilegios.
 

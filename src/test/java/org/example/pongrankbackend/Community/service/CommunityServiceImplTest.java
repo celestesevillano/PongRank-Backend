@@ -69,6 +69,9 @@ class CommunityServiceImplTest {
     @Mock
     private ClubMembershipRepository clubMembershipRepository;
 
+    @Mock
+    private org.example.pongrankbackend.Membership.repository.MembershipRepository plans;
+
     private CommunityPlanLimits planLimits;
     private CommunityServiceImpl communityService;
 
@@ -78,7 +81,8 @@ class CommunityServiceImplTest {
     @BeforeEach
     void setUp() {
         CommunityMapper communityMapper = new CommunityMapper(modelMapper);
-        CommunityAccessPolicy accessPolicy = new CommunityAccessPolicy(membershipRepository);
+        CommunityLifecycle lifecycle = new CommunityLifecycle(communityRepository, plans);
+        CommunityAccessPolicy accessPolicy = new CommunityAccessPolicy(membershipRepository, lifecycle);
         SpaceQuotaService spaces = new SpaceQuotaService(playerRepository, membershipRepository,
                 clubRepository, clubMembershipRepository, membershipService);
         planLimits = new CommunityPlanLimits(communityRepository, spaces, membershipService);
@@ -87,7 +91,7 @@ class CommunityServiceImplTest {
                 communityMapper, accessPolicy, planLimits);
         communityService = new CommunityServiceImpl(
                 communityRepository, membershipRepository, playerRepository,
-                communityMapper, accessPolicy, planLimits, memberService);
+                communityMapper, accessPolicy, planLimits, memberService, lifecycle);
 
         ReflectionTestUtils.setField(planLimits, "maxCreatedFreemium", 1);
         ReflectionTestUtils.setField(planLimits, "maxCreatedBasic", 5);
@@ -99,6 +103,11 @@ class CommunityServiceImplTest {
         ReflectionTestUtils.setField(spaces, "maxEnterprise", 10);
 
         lenient().when(membershipService.getActivePlan(anyLong())).thenReturn(MembershipPlan.FREEMIUM);
+
+        lenient().when(plans.findByPlayerIdAndStatus(CREATOR_ID,
+                org.example.pongrankbackend.Membership.MembershipStatus.ACTIVE))
+                .thenReturn(Optional.of(org.example.pongrankbackend.Membership.Membership.builder()
+                        .endDate(java.time.LocalDateTime.now().plusDays(10)).build()));
 
         creator = Player.builder()
                 .id(CREATOR_ID)
@@ -154,7 +163,7 @@ class CommunityServiceImplTest {
     }
 
     private void givenActiveCommunitiesCreated(long count) {
-        when(communityRepository.countByCreatorIdAndStatus(anyLong(), eq(CommunityStatus.ACTIVE)))
+        when(communityRepository.countManagedCommunities(anyLong(), eq(CommunityStatus.ACTIVE)))
                 .thenReturn(count);
     }
 
@@ -227,7 +236,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("responde 404 cuando la comunidad no existe")
         void shouldThrowExceptionWhenCommunityDoesNotExist() {
-            when(communityRepository.findByIdWithCreator(anyLong())).thenReturn(Optional.empty());
+            when(communityRepository.findByIdForUpdate(anyLong())).thenReturn(Optional.empty());
 
             thenFailsWith(HttpStatus.NOT_FOUND,
                     () -> communityService.getCommunityById(999L, CREATOR_ID));
@@ -236,7 +245,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("responde 403 cuando quien actualiza no es administrador")
         void shouldThrowExceptionWhenNonAdminUpdatesCommunity() {
-            when(communityRepository.findById(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
             givenRequesterIsAdmin(false);
 
             thenFailsWith(HttpStatus.FORBIDDEN, () -> communityService.updateCommunity(
@@ -248,7 +257,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("responde 409 cuando el nombre nuevo pertenece a otra comunidad")
         void shouldThrowExceptionWhenNewNameBelongsToAnotherCommunity() {
-            when(communityRepository.findById(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
             givenRequesterIsAdmin(true);
             when(communityRepository.existsByNameIgnoreCaseAndStatusAndIdNot(anyString(), eq(CommunityStatus.ACTIVE), anyLong()))
                     .thenReturn(true);
@@ -260,25 +269,90 @@ class CommunityServiceImplTest {
         }
 
         @Test
-        @DisplayName("archivar cambia el estado sin borrar el registro")
-        void shouldSetStatusArchivedWhenCommunityIsDeleted() {
+        @DisplayName("actualiza el tipo y conserva la etiqueta si una edición posterior los omite")
+        void shouldUpdateTypeAndKeepLabelWhenOmitted() {
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            givenRequesterIsAdmin(true);
+            when(modelMapper.map(community, CommunityResponseDTO.class))
+                    .thenAnswer(call -> new ModelMapper().map(community, CommunityResponseDTO.class));
+            CommunityUpdateRequestDTO request = updateRequest();
+            request.setCommunityType(CommunityType.OTHER);
+            request.setCustomLabel("  Liga vecinal  ");
+
+            communityService.updateCommunity(COMMUNITY_ID, request, CREATOR_ID);
+            communityService.updateCommunity(COMMUNITY_ID, updateRequest(), CREATOR_ID);
+
+            assertThat(community.getCommunityType()).isEqualTo(CommunityType.OTHER);
+            assertThat(community.getCustomLabel()).isEqualTo("Liga vecinal");
+
+            request.setCommunityType(CommunityType.PLAY_GROUP);
+            request.setCustomLabel(null);
+            communityService.updateCommunity(COMMUNITY_ID, request, CREATOR_ID);
+
+            assertThat(community.getCommunityType()).isEqualTo(CommunityType.PLAY_GROUP);
+            assertThat(community.getCustomLabel()).isNull();
+        }
+
+        @Test
+        @DisplayName("rechaza actualizar a Otro sin una etiqueta")
+        void shouldRejectOtherWithoutCustomLabel() {
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            givenRequesterIsAdmin(true);
+            CommunityUpdateRequestDTO request = updateRequest();
+            request.setCommunityType(CommunityType.OTHER);
+            request.setCustomLabel("   ");
+
+            thenFailsWith(HttpStatus.BAD_REQUEST, () -> communityService.updateCommunity(
+                    COMMUNITY_ID, request, CREATOR_ID));
+
+            assertThat(community.getCommunityType()).isEqualTo(CommunityType.UNIVERSITY);
+        }
+
+        @Test
+        @DisplayName("transfiere la administración a un miembro con plan vigente")
+        void shouldTransferAdministration() {
+            CommunityMembership currentAdmin = membership(CommunityRole.COMMUNITY_ADMIN, MembershipStatus.ACTIVE);
+            CommunityMembership receivingMember = membership(CommunityRole.MEMBER, MembershipStatus.ACTIVE);
+            when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
+            givenRequesterIsAdmin(true);
+            when(membershipRepository.findByCommunityIdAndPlayerId(COMMUNITY_ID, CREATOR_ID))
+                    .thenReturn(Optional.of(currentAdmin));
+            when(membershipRepository.findByCommunityIdAndPlayerId(COMMUNITY_ID, OTHER_PLAYER_ID))
+                    .thenReturn(Optional.of(receivingMember));
+            when(playerRepository.lockForSpaceAllocation(OTHER_PLAYER_ID)).thenReturn(Optional.of(creator));
+            when(membershipService.getActivePlan(OTHER_PLAYER_ID)).thenReturn(MembershipPlan.BASIC);
+            java.time.LocalDateTime expiry = java.time.LocalDateTime.now().plusDays(4);
+            when(plans.findByPlayerIdAndStatus(OTHER_PLAYER_ID, org.example.pongrankbackend.Membership.MembershipStatus.ACTIVE))
+                    .thenReturn(Optional.of(org.example.pongrankbackend.Membership.Membership.builder().endDate(expiry).build()));
+
+            communityService.transferAdministration(COMMUNITY_ID, OTHER_PLAYER_ID, CREATOR_ID);
+
+            assertThat(community.managingPlayerId()).isEqualTo(OTHER_PLAYER_ID);
+            assertThat(community.getPlanExpiresAt()).isEqualTo(expiry);
+            assertThat(currentAdmin.getRole()).isEqualTo(CommunityRole.MEMBER);
+            assertThat(receivingMember.getRole()).isEqualTo(CommunityRole.COMMUNITY_ADMIN);
+        }
+
+        @Test
+        @DisplayName("eliminar cierra la comunidad sin borrar el historial")
+        void shouldSetStatusDeletedWithoutDeletingHistory() {
             when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
             givenRequesterIsAdmin(true);
 
             communityService.archiveCommunity(COMMUNITY_ID, CREATOR_ID);
 
-            assertThat(community.getStatus()).isEqualTo(CommunityStatus.ARCHIVED);
+            assertThat(community.getStatus()).isEqualTo(CommunityStatus.DELETED);
             verify(communityRepository, never()).delete(any());
             verify(communityRepository, never()).deleteById(anyLong());
         }
 
         @Test
-        @DisplayName("responde 409 al archivar una comunidad ya archivada")
-        void shouldThrowExceptionWhenArchivingArchivedCommunity() {
+        @DisplayName("responde 403 si quien intenta eliminar no administra la comunidad")
+        void shouldRejectDeletingCommunityWithoutAdminRole() {
             community.setStatus(CommunityStatus.ARCHIVED);
             when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
 
-            thenFailsWith(HttpStatus.CONFLICT,
+            thenFailsWith(HttpStatus.FORBIDDEN,
                     () -> communityService.archiveCommunity(COMMUNITY_ID, CREATOR_ID));
         }
     }
@@ -592,6 +666,7 @@ class CommunityServiceImplTest {
         @Test
         @DisplayName("permite salir cuando existe otro administrador activo")
         void shouldAllowAdminToLeaveWhenAnotherAdminExists() {
+            community.setResponsibleAdminId(OTHER_PLAYER_ID);
             CommunityMembership admin = membership(CommunityRole.COMMUNITY_ADMIN,
                     MembershipStatus.ACTIVE);
 
@@ -629,7 +704,7 @@ class CommunityServiceImplTest {
 
             assertThat(admin.getStatus()).isEqualTo(MembershipStatus.INACTIVE);
             assertThat(admin.getLeftAt()).isNotNull();
-            assertThat(community.getStatus()).isEqualTo(CommunityStatus.ARCHIVED);
+            assertThat(community.getStatus()).isEqualTo(CommunityStatus.DELETED);
         }
 
         @Test

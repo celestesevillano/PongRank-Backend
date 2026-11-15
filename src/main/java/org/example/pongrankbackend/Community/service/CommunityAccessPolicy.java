@@ -9,13 +9,18 @@ import org.example.pongrankbackend.common.exception.CommunityMembershipException
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Component
 public class CommunityAccessPolicy {
 
     private final CommunityMembershipRepository membershipRepository;
 
-    public CommunityAccessPolicy(CommunityMembershipRepository membershipRepository) {
+    private final CommunityLifecycle lifecycle;
+
+    public CommunityAccessPolicy(CommunityMembershipRepository membershipRepository, CommunityLifecycle lifecycle) {
         this.membershipRepository = membershipRepository;
+        this.lifecycle = lifecycle;
     }
 
     public void verifyRequesterIsAdmin(Long communityId, Long requesterId) {
@@ -29,9 +34,10 @@ public class CommunityAccessPolicy {
     }
 
     public void verifyCommunityIsActive(Community community) {
-        if (community.getStatus() == CommunityStatus.ARCHIVED) {
-            throw new CommunityMembershipException(
-                    "Community is archived and cannot be modified");
+        LocalDateTime now = LocalDateTime.now();
+        lifecycle.reconcile(community, now);
+        if (community.getStatus() != CommunityStatus.ACTIVE || lifecycle.inGrace(community, now)) {
+            throw new CommunityMembershipException("La gestión de esta comunidad está pausada.");
         }
     }
 }

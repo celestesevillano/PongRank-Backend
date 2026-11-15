@@ -37,14 +37,14 @@ public class CommunityPlanLimits {
     }
 
     public void verifyCreationLimit(Long playerId) {
-        int limit = maxCreatedFor(membershipService.getActivePlan(playerId));
-
-        long createdActive = communityRepository.countByCreatorIdAndStatus(playerId, CommunityStatus.ACTIVE);
-
-        if (createdActive >= limit) {
-            throw new PlanRestrictionException(
-                    "Player " + playerId + " reached the maximum of " + limit + " active communities created for their plan");
+        if (!canManageAnotherCommunity(playerId)) {
+            throw new PlanRestrictionException("Ya administras el máximo de comunidades para tu plan.");
         }
+    }
+
+    public boolean canManageAnotherCommunity(Long playerId) {
+        int limit = maxCreatedFor(membershipService.getActivePlan(playerId));
+        return communityRepository.countManagedCommunities(playerId, CommunityStatus.ACTIVE) < limit;
     }
 
     public void verifyTotalMembershipLimit(Long playerId) {

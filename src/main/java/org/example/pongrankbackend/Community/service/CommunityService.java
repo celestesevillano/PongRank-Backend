@@ -2,6 +2,7 @@ package org.example.pongrankbackend.Community.service;
 
 import org.example.pongrankbackend.Community.CommunityType;
 import org.example.pongrankbackend.Community.dto.CommunityCreateRequestDTO;
+import org.example.pongrankbackend.Community.dto.CommunityAdministrationCandidateDTO;
 import org.example.pongrankbackend.Community.dto.CommunityDetailResponseDTO;
 import org.example.pongrankbackend.Community.dto.CommunityResponseDTO;
 import org.example.pongrankbackend.Community.dto.CommunityUpdateRequestDTO;
@@ -28,6 +29,12 @@ public interface CommunityService {
     CommunityResponseDTO updateCommunity(Long communityId, CommunityUpdateRequestDTO dto, Long requesterId);
 
     void archiveCommunity(Long communityId, Long requesterId);
+
+    Page<CommunityAdministrationCandidateDTO> getAdministrationCandidates(Long communityId, Long requesterId, Pageable pageable);
+
+    void transferAdministration(Long communityId, Long playerId, Long requesterId);
+
+    List<CommunityResponseDTO> getMyCommunitiesIncludingClosed(Long requesterId);
 
     Page<CommunityMemberResponseDTO> getCommunityMembers(Long communityId, Pageable pageable, Long requesterId);
 

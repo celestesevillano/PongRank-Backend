@@ -79,6 +79,19 @@ public class Community {
     @Column(name = "archived_at")
     private LocalDateTime archivedAt;
 
+    @Column(name = "responsible_admin_id")
+    private Long responsibleAdminId;
+
+    @Column(name = "plan_expires_at")
+    private LocalDateTime planExpiresAt;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    public Long managingPlayerId() {
+        return responsibleAdminId != null ? responsibleAdminId : creator.getId();
+    }
+
     @PrePersist
     protected void onCreate() {
         this.createdAt = LocalDateTime.now();

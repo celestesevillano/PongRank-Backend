@@ -3,6 +3,7 @@ package org.example.pongrankbackend.Community.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
+import org.example.pongrankbackend.Community.CommunityType;
 
 @Getter
 @Setter
@@ -16,4 +17,9 @@ public class CommunityUpdateRequestDTO {
 
     @Size(max = 500, message = "La descripción no puede superar los 500 caracteres")
     private String description;
+
+    private CommunityType communityType;
+
+    @Size(max = 40, message = "La etiqueta debe tener como máximo 40 caracteres")
+    private String customLabel;
 }
