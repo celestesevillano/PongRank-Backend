@@ -17,6 +17,8 @@ public interface MembershipRepository extends JpaRepository<Membership, Long> {
 
     Optional<Membership> findByPlayerIdAndStatus(Long playerId, MembershipStatus status);
 
+    List<Membership> findAllByPlayerIdAndStatus(Long playerId, MembershipStatus status);
+
     // para el job que vence membresías PREMIUM cuyo endDate ya pasó
     List<Membership> findByStatusAndEndDateBefore(MembershipStatus status, LocalDateTime endDate);
 }

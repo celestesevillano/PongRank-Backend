@@ -147,7 +147,9 @@ class MembershipServiceImplTest {
     @Test
     @DisplayName("activatePaidMembership: pone ACTIVE, fija startDate y endDate a 30 días")
     void activatePaidMembership_SetsActiveWithThirtyDayWindow() {
-        Membership membership = Membership.builder().plan(MembershipPlan.PRO).status(MembershipStatus.PENDING).build();
+        Player player = Player.builder().id(1L).build();
+        when(playerRepository.lockForUpdate(1L)).thenReturn(Optional.of(player));
+        Membership membership = Membership.builder().player(player).plan(MembershipPlan.PRO).status(MembershipStatus.PENDING).build();
 
         membershipService.activatePaidMembership(membership);
 
@@ -156,6 +158,24 @@ class MembershipServiceImplTest {
         assertThat(membership.getEndDate()).isAfter(membership.getStartDate().plusDays(29));
         assertThat(membership.getEndDate()).isBefore(membership.getStartDate().plusDays(31));
         verify(membershipRepository).save(membership);
+    }
+
+    @Test
+    @DisplayName("renovar el mismo plan conserva los días restantes y deja una sola membresía activa")
+    void renewingEarlyExtendsTheRemainingPeriod() {
+        Player player = Player.builder().id(1L).build();
+        LocalDateTime previousEnd = LocalDateTime.now().plusDays(2);
+        Membership previous = Membership.builder().id(2L).player(player).plan(MembershipPlan.PRO)
+                .status(MembershipStatus.ACTIVE).endDate(previousEnd).build();
+        Membership renewal = Membership.builder().id(3L).player(player).plan(MembershipPlan.PRO).build();
+        when(playerRepository.lockForUpdate(1L)).thenReturn(Optional.of(player));
+        when(membershipRepository.findAllByPlayerIdAndStatus(1L, MembershipStatus.ACTIVE)).thenReturn(List.of(previous));
+
+        membershipService.activatePaidMembership(renewal);
+
+        assertThat(previous.getStatus()).isEqualTo(MembershipStatus.EXPIRED);
+        assertThat(renewal.getStatus()).isEqualTo(MembershipStatus.ACTIVE);
+        assertThat(renewal.getEndDate()).isEqualTo(previousEnd.plusDays(30));
     }
 
     @Test

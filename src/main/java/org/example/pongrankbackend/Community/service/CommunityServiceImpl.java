@@ -4,6 +4,7 @@ import org.example.pongrankbackend.Community.Community;
 import org.example.pongrankbackend.Community.CommunityStatus;
 import org.example.pongrankbackend.Community.CommunityType;
 import org.example.pongrankbackend.Community.dto.CommunityCreateRequestDTO;
+import org.example.pongrankbackend.Community.dto.CommunityAdministrationCandidateDTO;
 import org.example.pongrankbackend.Community.dto.CommunityDetailResponseDTO;
 import org.example.pongrankbackend.Community.dto.CommunityResponseDTO;
 import org.example.pongrankbackend.Community.dto.CommunityUpdateRequestDTO;
@@ -16,11 +17,13 @@ import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRespon
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityMemberRoleUpdateDTO;
 import org.example.pongrankbackend.CommunityMembership.dto.CommunityRankingEntryDTO;
 import org.example.pongrankbackend.CommunityMembership.repository.CommunityMembershipRepository;
+import org.example.pongrankbackend.Membership.Membership;
 import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.InvalidCommunityException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -44,6 +47,7 @@ public class CommunityServiceImpl implements CommunityService {
     private final CommunityAccessPolicy accessPolicy;
     private final CommunityPlanLimits planLimits;
     private final CommunityMemberService memberService;
+    private final CommunityLifecycle lifecycle;
 
     public CommunityServiceImpl(CommunityRepository communityRepository,
                                 CommunityMembershipRepository membershipRepository,
@@ -51,7 +55,8 @@ public class CommunityServiceImpl implements CommunityService {
                                 CommunityMapper communityMapper,
                                 CommunityAccessPolicy accessPolicy,
                                 CommunityPlanLimits planLimits,
-                                CommunityMemberService memberService) {
+                                CommunityMemberService memberService,
+                                CommunityLifecycle lifecycle) {
         this.communityRepository = communityRepository;
         this.membershipRepository = membershipRepository;
         this.playerRepository = playerRepository;
@@ -59,6 +64,7 @@ public class CommunityServiceImpl implements CommunityService {
         this.accessPolicy = accessPolicy;
         this.planLimits = planLimits;
         this.memberService = memberService;
+        this.lifecycle = lifecycle;
     }
 
     @Override
@@ -71,13 +77,11 @@ public class CommunityServiceImpl implements CommunityService {
         }
 
         Player creator = loadPlayer(requesterId);
-        if (dto.getCommunityType() == CommunityType.OTHER
-                && (dto.getCustomLabel() == null || dto.getCustomLabel().isBlank())) {
-            throw new InvalidCommunityException("Escribe una etiqueta para el tipo Otro");
-        }
+        String customLabel = resolveCustomLabel(dto.getCommunityType(), dto.getCustomLabel());
         planLimits.verifyTotalMembershipLimit(requesterId);
         planLimits.verifyCreationLimit(requesterId);
-        Community community = buildCommunity(dto, name, creator);
+        Community community = buildCommunity(dto, name, creator, customLabel);
+        lifecycle.reconcile(community, LocalDateTime.now());
 
         try {
             Community saved = communityRepository.save(community);
@@ -110,6 +114,15 @@ public class CommunityServiceImpl implements CommunityService {
         List<CommunityMembership> memberships = membershipRepository
                 .findByPlayerIdWithActiveCommunity(requesterId, MembershipStatus.ACTIVE, CommunityStatus.ACTIVE);
 
+        return mapMemberships(memberships);
+    }
+
+    @Override
+    public List<CommunityResponseDTO> getMyCommunitiesIncludingClosed(Long requesterId) {
+        return mapMemberships(membershipRepository.findByPlayerIdWithCommunity(requesterId, MembershipStatus.ACTIVE));
+    }
+
+    private List<CommunityResponseDTO> mapMemberships(List<CommunityMembership> memberships) {
         List<Long> ids = memberships.stream()
                 .map(m -> m.getCommunity().getId())
                 .toList();
@@ -124,26 +137,31 @@ public class CommunityServiceImpl implements CommunityService {
     }
 
     @Override
+    @Transactional
     public CommunityDetailResponseDTO getCommunityById(Long communityId, Long requesterId) {
-        Community community = communityRepository.findByIdWithCreator(communityId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Community not found with id: " + communityId));
-
-        CommunityRole myRole = community.getStatus() == CommunityStatus.ACTIVE
-                ? findRequesterRole(communityId, requesterId) : null;
+        Community community = loadCommunityForUpdate(communityId);
+        LocalDateTime now = LocalDateTime.now();
+        lifecycle.reconcile(community, now);
+        CommunityRole myRole = findRequesterRole(communityId, requesterId);
+        if (community.getStatus() != CommunityStatus.ACTIVE && myRole == null
+                && !community.managingPlayerId().equals(requesterId)) {
+            throw new ResourceNotFoundException("No encontramos la comunidad");
+        }
         long memberCount = membershipRepository
                 .countByCommunityIdAndStatus(communityId, MembershipStatus.ACTIVE);
 
         long adminCount = membershipRepository.countByCommunityIdAndRoleAndStatus(
                 communityId, CommunityRole.COMMUNITY_ADMIN, MembershipStatus.ACTIVE);
-        return communityMapper.toDetailDto(community, myRole, memberCount, adminCount);
+        CommunityDetailResponseDTO detail = communityMapper.toDetailDto(community, myRole, memberCount, adminCount);
+        lifecycle.describe(community, detail, requesterId, now);
+        return detail;
     }
 
     @Override
     @Transactional
     public CommunityResponseDTO updateCommunity(Long communityId, CommunityUpdateRequestDTO dto,
                                                 Long requesterId) {
-        Community community = loadCommunity(communityId);
+        Community community = loadCommunityForUpdate(communityId);
         accessPolicy.verifyCommunityIsActive(community);
         accessPolicy.verifyRequesterIsAdmin(communityId, requesterId);
 
@@ -151,6 +169,13 @@ public class CommunityServiceImpl implements CommunityService {
 
         if (communityRepository.existsByNameIgnoreCaseAndStatusAndIdNot(name, CommunityStatus.ACTIVE, communityId)) {
             throw new ConflictException("Community name already in use: " + name);
+        }
+
+        if (dto.getCommunityType() != null || dto.getCustomLabel() != null) {
+            CommunityType type = dto.getCommunityType() != null ? dto.getCommunityType() : community.getCommunityType();
+            String label = resolveCustomLabel(type, dto.getCustomLabel());
+            community.setCommunityType(type);
+            community.setCustomLabel(label);
         }
 
         community.setName(name);
@@ -164,14 +189,56 @@ public class CommunityServiceImpl implements CommunityService {
 
     @Override
     @Transactional
-    public void archiveCommunity(Long communityId, Long requesterId) {
-        Community community = communityRepository.findByIdForUpdate(communityId)
-                .orElseThrow(() -> new ResourceNotFoundException("No encontramos la comunidad"));
-        accessPolicy.verifyCommunityIsActive(community);
+    public void deleteCommunity(Long communityId, Long requesterId) {
+        Community community = loadCommunityForUpdate(communityId);
         accessPolicy.verifyRequesterIsAdmin(communityId, requesterId);
+        LocalDateTime now = LocalDateTime.now();
+        lifecycle.reconcile(community, now);
+        if (community.getStatus() != CommunityStatus.DELETED) {
+            lifecycle.delete(community, now);
+        }
+    }
 
-        community.setStatus(CommunityStatus.ARCHIVED);
-        community.setArchivedAt(LocalDateTime.now());
+    @Override
+    @Transactional
+    public Page<CommunityAdministrationCandidateDTO> getAdministrationCandidates(Long communityId, Long requesterId, Pageable pageable) {
+        Community community = loadCommunityForUpdate(communityId);
+        LocalDateTime now = LocalDateTime.now();
+        verifyTransferWindow(community, requesterId, now);
+
+        return membershipRepository.findAdministrationCandidates(communityId, MembershipStatus.ACTIVE, requesterId, pageable)
+                .map(member -> {
+                    Long id = member.getPlayer().getId();
+                    boolean eligible = lifecycle.activePlan(id, now) != null && planLimits.canManageAnotherCommunity(id);
+                    return new CommunityAdministrationCandidateDTO(id, member.getPlayer().getName(), eligible);
+                });
+    }
+
+    @Override
+    @Transactional
+    public void transferAdministration(Long communityId, Long playerId, Long requesterId) {
+        Community community = loadCommunityForUpdate(communityId);
+        LocalDateTime now = LocalDateTime.now();
+        verifyTransferWindow(community, requesterId, now);
+        if (playerId.equals(requesterId)) {
+            throw new InvalidCommunityException("Elige a otro miembro.");
+        }
+        CommunityMembership receivingMember = membershipRepository.findByCommunityIdAndPlayerId(communityId, playerId)
+                .filter(member -> member.getStatus() == MembershipStatus.ACTIVE)
+                .orElseThrow(() -> new InvalidCommunityException("Elige a un miembro activo de la comunidad."));
+        CommunityMembership previousAdmin = membershipRepository.findByCommunityIdAndPlayerId(communityId, requesterId)
+                .orElseThrow(() -> new InvalidCommunityException("No encontramos a la persona responsable."));
+        playerRepository.lockForSpaceAllocation(playerId)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos al jugador"));
+        Membership plan = lifecycle.activePlan(playerId, now);
+        if (plan == null) {
+            throw new InvalidCommunityException("El nuevo administrador necesita un plan de pago activo.");
+        }
+        planLimits.verifyCreationLimit(playerId);
+        receivingMember.setRole(CommunityRole.COMMUNITY_ADMIN);
+        previousAdmin.setRole(CommunityRole.MEMBER);
+        community.setResponsibleAdminId(playerId);
+        community.setPlanExpiresAt(plan.getEndDate());
     }
 
     @Override
@@ -207,8 +274,19 @@ public class CommunityServiceImpl implements CommunityService {
         memberService.removeMember(communityId, playerId, requesterId);
     }
 
-    private Community loadCommunity(Long communityId) {
-        return communityRepository.findById(communityId)
+    private void verifyTransferWindow(Community community, Long requesterId, LocalDateTime now) {
+        accessPolicy.verifyRequesterIsAdmin(community.getId(), requesterId);
+        if (!community.managingPlayerId().equals(requesterId)) {
+            throw new UnauthorizedActionException("Solo la persona responsable puede transferir la administración.");
+        }
+        lifecycle.reconcile(community, now);
+        if (community.getStatus() != CommunityStatus.ACTIVE) {
+            throw new InvalidCommunityException("El plazo para transferir la administración terminó.");
+        }
+    }
+
+    private Community loadCommunityForUpdate(Long communityId) {
+        return communityRepository.findByIdForUpdate(communityId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Community not found with id: " + communityId));
     }
@@ -219,12 +297,22 @@ public class CommunityServiceImpl implements CommunityService {
                         "Player not found with id: " + playerId));
     }
 
-    private Community buildCommunity(CommunityCreateRequestDTO dto, String name, Player creator) {
+    private String resolveCustomLabel(CommunityType type, String label) {
+        if (type != CommunityType.OTHER) {
+            return null;
+        }
+        if (label == null || label.isBlank()) {
+            throw new InvalidCommunityException("Escribe una etiqueta para el tipo Otro");
+        }
+        return label.strip();
+    }
+
+    private Community buildCommunity(CommunityCreateRequestDTO dto, String name, Player creator, String customLabel) {
         return Community.builder()
                 .name(name)
                 .description(dto.getDescription())
                 .communityType(dto.getCommunityType())
-                .customLabel(dto.getCommunityType() == CommunityType.OTHER ? dto.getCustomLabel().strip() : null)
+                .customLabel(customLabel)
                 .status(CommunityStatus.ACTIVE)
                 .creator(creator)
                 .build();

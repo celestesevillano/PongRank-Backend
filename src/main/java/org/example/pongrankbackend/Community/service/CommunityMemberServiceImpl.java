@@ -51,7 +51,7 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
     @Override
     public Page<CommunityMemberResponseDTO> getCommunityMembers(Long communityId, Pageable pageable,
                                                                 Long requesterId) {
-        loadCommunity(communityId);
+        verifyCommunityReadable(communityId);
 
         return membershipRepository
                 .findMembersWithPlayer(communityId, MembershipStatus.ACTIVE, pageable)
@@ -61,7 +61,7 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
     @Override
     public Page<CommunityRankingEntryDTO> getCommunityRanking(Long communityId, Pageable pageable,
                                                               Long requesterId) {
-        loadCommunity(communityId);
+        verifyCommunityReadable(communityId);
 
         Page<CommunityMembership> page = membershipRepository
                 .findRankingWithPlayer(communityId, MembershipStatus.ACTIVE, pageable);
@@ -100,6 +100,7 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
 
         if (dto.getRole() != CommunityRole.COMMUNITY_ADMIN) {
             verifyNotLastAdmin(communityId, membership);
+            verifyNotResponsible(community, playerId);
         }
 
         membership.setRole(dto.getRole());
@@ -110,11 +111,13 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
     @Transactional
     public void removeMember(Long communityId, Long playerId, Long requesterId) {
         Community community = loadCommunityForUpdate(communityId);
-        accessPolicy.verifyCommunityIsActive(community);
-
         boolean isSelfRemoval = playerId.equals(requesterId);
         if (!isSelfRemoval) {
+            accessPolicy.verifyCommunityIsActive(community);
             accessPolicy.verifyRequesterIsAdmin(communityId, requesterId);
+        } else if (community.getStatus() == CommunityStatus.DELETED
+                || community.getStatus() == CommunityStatus.ARCHIVED) {
+            throw new CommunityMembershipException("Esta comunidad ya está cerrada.");
         }
 
         CommunityMembership membership = loadActiveMembership(communityId, playerId);
@@ -124,20 +127,23 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
 
         if (activeMembers > 1) {
             verifyNotLastAdmin(communityId, membership);
+            verifyNotResponsible(community, playerId);
         }
 
         deactivateMembership(membership);
 
         if (activeMembers == 1) {
-            community.setStatus(CommunityStatus.ARCHIVED);
-            community.setArchivedAt(LocalDateTime.now());
+            community.setStatus(CommunityStatus.DELETED);
+            community.setDeletedAt(LocalDateTime.now());
         }
     }
 
-    private Community loadCommunity(Long communityId) {
-        return communityRepository.findById(communityId)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Community not found with id: " + communityId));
+    private void verifyCommunityReadable(Long communityId) {
+        Community community = communityRepository.findById(communityId)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos la comunidad"));
+        if (community.getStatus() != CommunityStatus.ACTIVE) {
+            throw new ResourceNotFoundException("No encontramos la comunidad");
+        }
     }
 
     private Community loadCommunityForUpdate(Long communityId) {
@@ -161,6 +167,12 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
         }
 
         return membership;
+    }
+
+    private void verifyNotResponsible(Community community, Long playerId) {
+        if (community.managingPlayerId().equals(playerId)) {
+            throw new CommunityMembershipException("Transfiere la administración antes de salir o cambiar este rol.");
+        }
     }
 
     private void verifyNotLastAdmin(Long communityId, CommunityMembership target) {
