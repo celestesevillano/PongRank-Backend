@@ -116,7 +116,7 @@ public class CommunityMemberServiceImpl implements CommunityMemberService {
             accessPolicy.verifyCommunityIsActive(community);
             accessPolicy.verifyRequesterIsAdmin(communityId, requesterId);
         } else if (community.getStatus() == CommunityStatus.DELETED
-                || (community.getStatus() == CommunityStatus.ARCHIVED && community.getPlanExpiresAt() == null)) {
+                || community.getStatus() == CommunityStatus.ARCHIVED) {
             throw new CommunityMembershipException("Esta comunidad ya está cerrada.");
         }
 

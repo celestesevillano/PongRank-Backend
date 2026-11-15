@@ -2470,7 +2470,7 @@
           ]
         },
         {
-          "name": "Archivar comunidad",
+          "name": "Eliminar comunidad",
           "request": {
             "method": "DELETE",
             "header": [],

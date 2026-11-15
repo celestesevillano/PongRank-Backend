@@ -22,37 +22,32 @@ class CommunityLifecycleTest {
     private final Community community = Community.builder().responsibleAdminId(10L).planExpiresAt(EXPIRES).build();
 
     @Test
-    void archivesAfterOneDayAndDeletesThreeDaysLater() {
+    void deletesAtTheEndOfTheOnlyGracePeriod() {
         lifecycle.reconcile(community, EXPIRES.plusHours(23));
         assertThat(lifecycle.inGrace(community, EXPIRES.plusHours(23))).isTrue();
 
         lifecycle.reconcile(community, EXPIRES.plusDays(1));
-        assertThat(community.getStatus()).isEqualTo(CommunityStatus.ARCHIVED);
-        assertThat(community.getArchivedAt()).isEqualTo(EXPIRES.plusDays(1));
-
-        lifecycle.reconcile(community, EXPIRES.plusDays(4));
         assertThat(community.getStatus()).isEqualTo(CommunityStatus.DELETED);
-        assertThat(community.getDeletedAt()).isEqualTo(EXPIRES.plusDays(4));
+        assertThat(community.getDeletedAt()).isEqualTo(EXPIRES.plusDays(1));
     }
 
     @Test
-    void timelyRenewalRestoresArchivedCommunity() {
-        lifecycle.reconcile(community, EXPIRES.plusDays(1));
-        setRenewal(EXPIRES.plusDays(2));
+    void renewalWithinGraceKeepsTheCommunityActive() {
+        lifecycle.reconcile(community, EXPIRES.plusHours(5));
+        setRenewal(EXPIRES.plusHours(6));
 
-        lifecycle.reconcile(community, EXPIRES.plusDays(3));
+        lifecycle.reconcile(community, EXPIRES.plusHours(7));
         assertThat(community.getStatus()).isEqualTo(CommunityStatus.ACTIVE);
-        assertThat(community.getArchivedAt()).isNull();
-        assertThat(community.getPlanExpiresAt()).isEqualTo(EXPIRES.plusDays(32));
+        assertThat(community.getPlanExpiresAt()).isEqualTo(EXPIRES.plusHours(6).plusDays(30));
     }
 
     @Test
     void lateRenewalCannotUndoDeletionEvenIfTheSchedulerWasDelayed() {
-        setRenewal(EXPIRES.plusDays(4));
+        setRenewal(EXPIRES.plusDays(1));
 
-        lifecycle.reconcile(community, EXPIRES.plusDays(4).plusMinutes(1));
+        lifecycle.reconcile(community, EXPIRES.plusDays(1).plusMinutes(1));
         assertThat(community.getStatus()).isEqualTo(CommunityStatus.DELETED);
-        assertThat(community.getDeletedAt()).isEqualTo(EXPIRES.plusDays(4));
+        assertThat(community.getDeletedAt()).isEqualTo(EXPIRES.plusDays(1));
     }
 
     private void setRenewal(LocalDateTime startsAt) {

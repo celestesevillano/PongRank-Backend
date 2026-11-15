@@ -34,13 +34,13 @@ public class CommunityLifecycle {
         }
 
         LocalDateTime expires = community.getPlanExpiresAt();
-        if (community.getStatus() == CommunityStatus.ARCHIVED && expires == null) {
+        if (community.getStatus() == CommunityStatus.ARCHIVED) {
             return; // Previous manual closures remain final.
         }
 
         Membership plan = activePlan(community.managingPlayerId(), now);
         if (expires != null) {
-            LocalDateTime deletesAt = expires.plusDays(4);
+            LocalDateTime deletesAt = expires.plusDays(1);
             if (!now.isBefore(deletesAt) && (plan == null || plan.getStartDate() == null
                     || !plan.getStartDate().isBefore(deletesAt))) {
                 delete(community, deletesAt);
@@ -58,9 +58,6 @@ public class CommunityLifecycle {
         if (expires == null) {
             // Give existing communities the full grace period when first enrolled.
             community.setPlanExpiresAt(now);
-        } else if (!now.isBefore(expires.plusDays(1))) {
-            community.setStatus(CommunityStatus.ARCHIVED);
-            community.setArchivedAt(expires.plusDays(1));
         }
     }
 
@@ -87,14 +84,10 @@ public class CommunityLifecycle {
         dto.setServerTime(now);
         dto.setCanTransferAdministration(responsible && community.getStatus() == CommunityStatus.ACTIVE);
         if (community.getStatus() == CommunityStatus.DELETED
-                || (community.getStatus() == CommunityStatus.ARCHIVED && expires == null)) {
+                || (community.getStatus() == CommunityStatus.ARCHIVED)) {
             dto.setStatus(CommunityStatus.DELETED);
             dto.setLifecyclePhase("DELETED");
             dto.setDeletedAt(community.getDeletedAt() != null ? community.getDeletedAt() : community.getArchivedAt());
-        } else if (community.getStatus() == CommunityStatus.ARCHIVED) {
-            dto.setLifecyclePhase("ARCHIVED");
-            dto.setArchivedAt(community.getArchivedAt());
-            dto.setDeletesAt(expires.plusDays(4));
         } else if (inGrace(community, now)) {
             dto.setLifecyclePhase("GRACE");
             dto.setGraceEndsAt(expires.plusDays(1));

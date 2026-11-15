@@ -189,7 +189,7 @@ public class CommunityServiceImpl implements CommunityService {
 
     @Override
     @Transactional
-    public void archiveCommunity(Long communityId, Long requesterId) {
+    public void deleteCommunity(Long communityId, Long requesterId) {
         Community community = loadCommunityForUpdate(communityId);
         accessPolicy.verifyRequesterIsAdmin(communityId, requesterId);
         LocalDateTime now = LocalDateTime.now();

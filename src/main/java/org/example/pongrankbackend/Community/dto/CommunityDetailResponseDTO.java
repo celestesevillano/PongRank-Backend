@@ -31,7 +31,5 @@ public class CommunityDetailResponseDTO {
     private LocalDateTime serverTime;
     private LocalDateTime planExpiresAt;
     private LocalDateTime graceEndsAt;
-    private LocalDateTime archivedAt;
-    private LocalDateTime deletesAt;
     private LocalDateTime deletedAt;
 }

@@ -100,10 +100,10 @@ public class CommunityController {
     }
 
     @DeleteMapping("/{communityId}")
-    public ResponseEntity<Void> archiveCommunity(
+    public ResponseEntity<Void> deleteCommunity(
             @PathVariable Long communityId,
             @AuthenticationPrincipal CustomUserDetails currentUser) {
-        communityService.archiveCommunity(communityId, currentUser.getId());
+        communityService.deleteCommunity(communityId, currentUser.getId());
         return ResponseEntity.noContent().build();
     }
 

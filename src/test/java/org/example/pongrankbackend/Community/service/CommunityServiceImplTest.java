@@ -339,7 +339,7 @@ class CommunityServiceImplTest {
             when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
             givenRequesterIsAdmin(true);
 
-            communityService.archiveCommunity(COMMUNITY_ID, CREATOR_ID);
+            communityService.deleteCommunity(COMMUNITY_ID, CREATOR_ID);
 
             assertThat(community.getStatus()).isEqualTo(CommunityStatus.DELETED);
             verify(communityRepository, never()).delete(any());
@@ -353,7 +353,7 @@ class CommunityServiceImplTest {
             when(communityRepository.findByIdForUpdate(COMMUNITY_ID)).thenReturn(Optional.of(community));
 
             thenFailsWith(HttpStatus.FORBIDDEN,
-                    () -> communityService.archiveCommunity(COMMUNITY_ID, CREATOR_ID));
+                    () -> communityService.deleteCommunity(COMMUNITY_ID, CREATOR_ID));
         }
     }
 

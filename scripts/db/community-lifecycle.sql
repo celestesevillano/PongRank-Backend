@@ -24,7 +24,7 @@ ALTER TABLE communities ADD CONSTRAINT communities_status_check
 
 UPDATE communities AS community
 SET status = 'DELETED', deleted_at = COALESCE(archived_at, now())
-WHERE status = 'ARCHIVED' AND plan_expires_at IS NULL;
+WHERE status = 'ARCHIVED';
 
 UPDATE communities AS community
 SET responsible_admin_id = (
@@ -37,6 +37,6 @@ WHERE responsible_admin_id IS NULL AND status = 'ACTIVE';
 
 DROP INDEX IF EXISTS uq_communities_active_name;
 CREATE UNIQUE INDEX uq_communities_active_name ON communities (lower(name))
-    WHERE status = 'ACTIVE' OR (status = 'ARCHIVED' AND plan_expires_at IS NOT NULL);
+    WHERE status = 'ACTIVE';
 
 COMMIT;

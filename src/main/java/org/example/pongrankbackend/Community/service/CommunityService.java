@@ -28,7 +28,7 @@ public interface CommunityService {
 
     CommunityResponseDTO updateCommunity(Long communityId, CommunityUpdateRequestDTO dto, Long requesterId);
 
-    void archiveCommunity(Long communityId, Long requesterId);
+    void deleteCommunity(Long communityId, Long requesterId);
 
     Page<CommunityAdministrationCandidateDTO> getAdministrationCandidates(Long communityId, Long requesterId, Pageable pageable);
 

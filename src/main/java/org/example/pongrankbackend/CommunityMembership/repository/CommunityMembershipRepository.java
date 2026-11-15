@@ -29,15 +29,8 @@ public interface CommunityMembershipRepository extends JpaRepository<CommunityMe
 
     long countByCommunityIdAndStatus(Long communityId, MembershipStatus status);
 
-    @Query("""
-            SELECT COUNT(m) FROM CommunityMembership m
-            WHERE m.player.id = :playerId AND m.status = :status
-              AND (m.community.status = :communityStatus
-                   OR (m.community.status = ARCHIVED AND m.community.planExpiresAt IS NOT NULL))
-            """)
     long countByPlayerIdAndStatusAndCommunityStatus(
-            @Param("playerId") Long playerId, @Param("status") MembershipStatus status,
-            @Param("communityStatus") CommunityStatus communityStatus);
+            Long playerId, MembershipStatus status, CommunityStatus communityStatus);
 
     @Query(value = """
             SELECT m FROM CommunityMembership m JOIN FETCH m.player p
