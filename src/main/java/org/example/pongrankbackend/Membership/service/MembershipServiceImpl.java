@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -84,9 +85,26 @@ public class MembershipServiceImpl implements MembershipService {
     @Override
     @Transactional
     public void activatePaidMembership(Membership membership) {
+        Long playerId = membership.getPlayer().getId();
+        playerRepository.lockForUpdate(playerId)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos al jugador"));
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime renewalBase = now;
+        for (Membership previous : membershipRepository.findAllByPlayerIdAndStatus(playerId, MembershipStatus.ACTIVE)) {
+            if (previous == membership || Objects.equals(previous.getId(), membership.getId())) {
+                continue;
+            }
+            if (previous.getPlan() == membership.getPlan() && previous.getEndDate() != null
+                    && previous.getEndDate().isAfter(renewalBase)) {
+                renewalBase = previous.getEndDate();
+            }
+            previous.setStatus(MembershipStatus.EXPIRED);
+        }
+
         membership.setStatus(MembershipStatus.ACTIVE);
-        membership.setStartDate(LocalDateTime.now());
-        membership.setEndDate(LocalDateTime.now().plusDays(PAID_PLAN_DURATION_DAYS));
+        membership.setStartDate(now);
+        membership.setEndDate(renewalBase.plusDays(PAID_PLAN_DURATION_DAYS));
         membershipRepository.save(membership);
     }
 
