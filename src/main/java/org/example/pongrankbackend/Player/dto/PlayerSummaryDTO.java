@@ -1,14 +1,16 @@
 package org.example.pongrankbackend.Player.dto;
 
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
+@Builder(toBuilder = true)
 public class PlayerSummaryDTO {
 
     private Long id;
@@ -18,6 +20,7 @@ public class PlayerSummaryDTO {
     private String categoryFdptm;
     private Boolean federatedDeclared;
 
-    // null salvo que el jugador tenga shareContact=true (ver ModelMapperConfig)
+    // Only populated for the opponent in authorized match responses.
+    @Setter(AccessLevel.NONE)
     private String whatsapp;
 }

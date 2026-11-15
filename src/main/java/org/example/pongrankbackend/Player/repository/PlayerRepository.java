@@ -20,6 +20,10 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     @Query("SELECT p FROM Player p WHERE p.id = :playerId")
     Optional<Player> lockForSpaceAllocation(@Param("playerId") Long playerId);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT p FROM Player p WHERE p.id = :playerId")
+    Optional<Player> lockForUpdate(@Param("playerId") Long playerId);
+
     Optional<Player> findByEmail(String email);
 
     boolean existsByEmail(String email);

@@ -19,6 +19,7 @@ import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.example.pongrankbackend.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -163,7 +164,7 @@ public class MatchServiceImpl implements MatchService {
     public MatchDetailResponseDTO getMatchById(Long matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new ResourceNotFoundException("Partido no encontrado con ID: " + matchId));
-        return matchMapper.toDetailResponseDTO(match);
+        return matchMapper.toDetailResponseDTO(match, SecurityUtils.getCurrentUserId().orElse(null));
     }
 
     @Override

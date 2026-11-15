@@ -189,6 +189,8 @@ class MatchServiceImplTest {
     void joinOpenMatch_Success_SetsPlayer2AndNotifies() {
         Long joinerId = 2L;
         Player creator = createPlayer(1L, "Alice");
+        creator.setWhatsapp("+51999888777");
+        creator.setShareContact(true);
         Player joiner = createPlayer(joinerId, "Bob");
         Match openMatch = Match.builder().id(30L).player1(creator).matchType(MatchType.LOCATION)
                 .status(MatchStatus.CREATED)
@@ -207,7 +209,9 @@ class MatchServiceImplTest {
         assertThat(result).isNotNull();
         assertThat(openMatch.getPlayer2()).isEqualTo(joiner);
         verify(matchRuleValidator).validateRatingGap(creator, joiner);
-        verify(webSocketNotifier).notifyMatchJoined(eq(1L), eq(result));
+        assertThat(result.getPlayer1().getWhatsapp()).isEqualTo("+51999888777");
+        verify(webSocketNotifier).notifyMatchJoined(eq(1L), argThat(item ->
+                item.getId().equals(result.getId()) && item.getPlayer1().getWhatsapp() == null));
     }
 
     @Test

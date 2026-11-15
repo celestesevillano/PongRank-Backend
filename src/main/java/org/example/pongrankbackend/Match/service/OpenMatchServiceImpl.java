@@ -93,7 +93,7 @@ public class OpenMatchServiceImpl implements OpenMatchService {
 
         webSocketNotifier.notifyMatchJoined(match.getPlayer1().getId(), responseDTO);
 
-        return responseDTO;
+        return matchMapper.forJoiningPlayer(savedMatch, responseDTO);
     }
 
     private boolean withinRatingGap(Player a, Player b) {

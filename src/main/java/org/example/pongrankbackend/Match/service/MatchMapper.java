@@ -4,6 +4,8 @@ import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.Match.MatchStatus;
 import org.example.pongrankbackend.Match.dto.*;
 import org.example.pongrankbackend.MatchSet.dto.MatchSetResponseDTO;
+import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Player.PlayerStatus;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Component;
@@ -70,8 +72,33 @@ public class MatchMapper {
                 .build();
     }
 
+    MatchResponseDTO forJoiningPlayer(Match match, MatchResponseDTO response) {
+        String contact = sharedContact(match.getPlayer1());
+        return contact == null ? response : response.toBuilder()
+                .player1(response.getPlayer1().toBuilder().whatsapp(contact).build())
+                .build();
+    }
+
+    private static String sharedContact(Player player) {
+        return player.getStatus() == PlayerStatus.ACTIVE && Boolean.TRUE.equals(player.getShareContact())
+                ? player.getWhatsapp() : null;
+    }
+
     public MatchDetailResponseDTO toDetailResponseDTO(Match match) {
+        return toDetailResponseDTO(match, null);
+    }
+
+    MatchDetailResponseDTO toDetailResponseDTO(Match match, Long viewerId) {
         MatchResponseDTO base = toResponseDTO(match);
+
+        if (viewerId != null && match.getPlayer2() != null && (match.getStatus() == MatchStatus.CREATED
+                || match.getStatus() == MatchStatus.PROPOSED_P1 || match.getStatus() == MatchStatus.PROPOSED_P2)) {
+            if (viewerId.equals(match.getPlayer2().getId())) {
+                base.setPlayer1(base.getPlayer1().toBuilder().whatsapp(sharedContact(match.getPlayer1())).build());
+            } else if (viewerId.equals(match.getPlayer1().getId())) {
+                base.setPlayer2(base.getPlayer2().toBuilder().whatsapp(sharedContact(match.getPlayer2())).build());
+            }
+        }
 
         List<MatchSetResponseDTO> setDTOs = new ArrayList<>();
         if (match.getSets() != null) {
