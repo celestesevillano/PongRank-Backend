@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 import org.example.pongrankbackend.CommunityMembership.CommunityMembership;
 import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Match.Match;
@@ -16,6 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
+@DynamicUpdate
 @Table(
     name = "players",
     indexes = {
@@ -67,6 +69,11 @@ public class Player {
     @Column(name = "share_contact")
     @Builder.Default
     private Boolean shareContact = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "pongmigos_visibility", length = 20)
+    @Builder.Default
+    private PongmigosVisibility pongmigosVisibility = PongmigosVisibility.ONLY_ME;
 
     @Size(max = 50)
     @Column(name = "category_fdptm", length = 50)

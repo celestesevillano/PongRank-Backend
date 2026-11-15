@@ -166,6 +166,14 @@ La API queda en `http://localhost:8080`. La instancia desplegada está en `http:
 
 Rutas base bajo `/api/v1`: `auth` (6, incluye `/forgot-password` y `/reset-password`), `players` (5, incluye `DELETE /players/me`), `friendships` (5), `communities` (11), `matches` y `match-sets` (13, incluye `GET /matches/open` y `POST /{id}/join`), `clubs`, `club-memberships` y `admin/clubs` (20), `tournaments` (14), `training-sessions` (3) y `payments` (3).
 
+### Visibilidad de Pongmigos
+
+Las tres rutas requieren un token de sesión Bearer.
+
+- `GET /api/v1/friendships/me/visibility` devuelve la preferencia del titular. `ONLY_ME` («Solo yo») es el valor inicial para cuentas nuevas y existentes.
+- `PATCH /api/v1/friendships/me/visibility` cambia la preferencia de la cuenta autenticada. Envía `{"visibility":"EVERYONE"}` para «Todos» o `{"visibility":"ONLY_ME"}` para «Solo yo».
+- `GET /api/v1/friendships/players/{playerId}/public-list?page=0&size=10` devuelve `total` y `canViewList`. Cuando el visitante tiene acceso, también devuelve `pongmigos` como página. Cada entrada incluye `id`, `name`, `username` y `mutual`. El titular siempre puede consultar su lista. Si la lista es privada, los demás solo reciben el total y `canViewList: false`.
+
 ## 10. Conclusión
 
 **Logros.** El backend implementa **16 entidades** con relaciones no triviales —dos muchos-a-muchos con atributos propios, una reflexiva y un uno-a-uno opcional entre partidos casuales y de torneo— sobre una arquitectura en capas con inyección por constructor, más autenticación stateless con JWT, autorización en dos niveles y secretos solo por entorno. Un jugador puede registrarse, hallar rivales de nivel similar, jugar partidos verificados por ambas partes y ver evolucionar su rating con una medida explícita de confianza.

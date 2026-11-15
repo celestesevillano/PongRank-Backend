@@ -4,19 +4,28 @@ import org.example.pongrankbackend.Friendship.Friendship;
 import org.example.pongrankbackend.Friendship.FriendshipStatus;
 import org.example.pongrankbackend.Friendship.dto.FriendshipRequestDTO;
 import org.example.pongrankbackend.Friendship.dto.FriendshipResponseDTO;
+import org.example.pongrankbackend.Friendship.dto.PongmigosProfileDTO;
+import org.example.pongrankbackend.Friendship.dto.PongmigosVisibilityDTO;
 import org.example.pongrankbackend.Friendship.repository.FriendshipRepository;
 import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Player.PlayerStatus;
+import org.example.pongrankbackend.Player.PongmigosVisibility;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
 import org.example.pongrankbackend.security.PlayerAccessGuard;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.FriendshipRequestException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
 import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
+import org.example.pongrankbackend.common.pagination.PageRequestFactory;
+import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.modelmapper.ModelMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Set;
 
 @Service
 @Transactional(readOnly = true)
@@ -201,5 +210,49 @@ public class FriendshipServiceImpl implements FriendshipService {
         return sentRequests.stream()
                 .map(friendship -> modelMapper.map(friendship, FriendshipResponseDTO.class))
                 .toList();
+    }
+
+    @Override
+    public PongmigosVisibilityDTO getPongmigosVisibility(Long playerId) {
+        return new PongmigosVisibilityDTO(visibilityOf(findActivePlayer(playerId)));
+    }
+
+    @Override
+    @Transactional
+    public PongmigosVisibilityDTO updatePongmigosVisibility(Long playerId, PongmigosVisibility visibility) {
+        Player player = findActivePlayer(playerId);
+        player.setPongmigosVisibility(visibility);
+        return new PongmigosVisibilityDTO(visibility);
+    }
+
+    @Override
+    public PongmigosProfileDTO getPongmigosProfile(Long playerId, Long viewerId, int page, int size) {
+        Player player = findActivePlayer(playerId);
+        boolean viewingOwnProfile = playerId.equals(viewerId);
+        if (!viewingOwnProfile && visibilityOf(player) == PongmigosVisibility.ONLY_ME) {
+            return new PongmigosProfileDTO(friendshipRepository.countActivePongmigos(playerId), false, null);
+        }
+
+        Page<Player> pongmigos = friendshipRepository.listActivePongmigos(playerId,
+                PageRequestFactory.of(page, size, Sort.by("name", "id")));
+        Set<Long> mutualIds = viewingOwnProfile || pongmigos.isEmpty() ? Set.of()
+                : friendshipRepository.findActivePongmigoIdsAmong(viewerId,
+                        pongmigos.getContent().stream().map(Player::getId).toList());
+
+        return new PongmigosProfileDTO(pongmigos.getTotalElements(), true,
+                PageResponseDTO.from(pongmigos, friend -> new PongmigosProfileDTO.Entry(
+                        friend.getId(), friend.getName(), friend.getUsername(), mutualIds.contains(friend.getId()))));
+    }
+
+    private Player findActivePlayer(Long playerId) {
+        return playerRepository.findById(playerId)
+                .filter(player -> player.getStatus() == PlayerStatus.ACTIVE)
+                .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
+    }
+
+    private PongmigosVisibility visibilityOf(Player player) {
+        // Las cuentas anteriores a este campo tienen la lista privada hasta que el titular la haga visible.
+        return player.getPongmigosVisibility() == PongmigosVisibility.EVERYONE
+                ? PongmigosVisibility.EVERYONE : PongmigosVisibility.ONLY_ME;
     }
 }
