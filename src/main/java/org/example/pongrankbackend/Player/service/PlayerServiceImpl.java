@@ -23,6 +23,7 @@ import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.Player.repository.PlayerPresentationRepository;
 import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.service.AuthService;
 import org.example.pongrankbackend.Player.event.AccountDeletedEvent;
@@ -55,6 +56,7 @@ public class PlayerServiceImpl implements PlayerService {
     private static final int MIN_SEARCH_LENGTH = 2;
 
     private final PlayerRepository playerRepository;
+    private final PlayerPresentationRepository playerPresentations;
     private final ClubRepository clubRepository;
     private final ClubMembershipRepository clubMembershipRepository;
     private final CommunityMembershipRepository communityMembershipRepository;
@@ -76,8 +78,10 @@ public class PlayerServiceImpl implements PlayerService {
                              ModelMapper modelMapper,
                              AuthService authService,
                              PlayerAccessGuard playerAccessGuard,
-                             AgeCategorySuggester ageCategorySuggester) {
+                             AgeCategorySuggester ageCategorySuggester,
+                             PlayerPresentationRepository playerPresentations) {
         this.playerRepository = playerRepository;
+        this.playerPresentations = playerPresentations;
         this.clubRepository = clubRepository;
         this.clubMembershipRepository = clubMembershipRepository;
         this.communityMembershipRepository = communityMembershipRepository;
@@ -105,11 +109,9 @@ public class PlayerServiceImpl implements PlayerService {
         Long currentUserId = SecurityUtils.getCurrentUserId().orElse(null);
         boolean isOwnerOrAdmin = (currentUserId != null && currentUserId.equals(id))
                 || SecurityUtils.hasRole("SYSTEM_ADMIN");
-        if (!isOwnerOrAdmin && Boolean.FALSE.equals(player.getShareContact())) {
+        if (!isOwnerOrAdmin) {
             response.setEmail(null);
             response.setWhatsapp(null);
-        }
-        if (!isOwnerOrAdmin) {
             response.setBirthDate(null);
             response.setGender(null);
         }
@@ -161,7 +163,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Transactional
     public PlayerResponseDTO updatePlayer(Long playerId, PlayerUpdateRequestDTO dto) {
         playerAccessGuard.requireSelfOrAdmin(playerId, "Solo puedes actualizar la información de tu propio perfil");
-        Player player = playerRepository.findById(playerId)
+        Player player = playerRepository.lockForUpdate(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
 
         if (dto.getUsername() != null) {
@@ -182,7 +184,7 @@ public class PlayerServiceImpl implements PlayerService {
     @Transactional
     public void deleteAccount(DeleteAccountRequestDTO dto) {
         Long playerId = SecurityUtils.getRequiredCurrentUserId();
-        Player player = playerRepository.findById(playerId)
+        Player player = playerRepository.lockForUpdate(playerId)
                 .orElseThrow(() -> new ResourceNotFoundException("Jugador no encontrado con ID: " + playerId));
 
         validatePassword(dto.getPassword(), player);
@@ -198,6 +200,7 @@ public class PlayerServiceImpl implements PlayerService {
         LocalDateTime now = LocalDateTime.now();
         deactivateCommunityMemberships(activeCommunityMemberships, now);
         deactivateClubMemberships(playerId, now);
+        playerPresentations.deleteById(playerId);
         anonymizeAndDeactivate(player, playerId, now);
     }
 

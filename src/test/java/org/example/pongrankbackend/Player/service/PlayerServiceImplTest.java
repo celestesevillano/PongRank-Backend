@@ -24,6 +24,7 @@ import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.repository.PlayerRepository;
+import org.example.pongrankbackend.Player.repository.PlayerPresentationRepository;
 import org.example.pongrankbackend.auth.dto.AuthResponseDTO;
 import org.example.pongrankbackend.auth.service.AuthService;
 import org.example.pongrankbackend.common.exception.ConflictException;
@@ -62,6 +63,9 @@ class PlayerServiceImplTest {
 
     @Mock
     private PlayerRepository playerRepository;
+
+    @Mock
+    private PlayerPresentationRepository playerPresentations;
 
     @Mock
     private ClubRepository clubRepository;
@@ -226,7 +230,7 @@ class PlayerServiceImplTest {
         Player existingPlayer = Player.builder().id(playerId).name("Carlos").build();
         PlayerUpdateRequestDTO updateDto = PlayerUpdateRequestDTO.builder().username("Carlos.TT").build();
 
-        when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
+        when(playerRepository.lockForUpdate(playerId)).thenReturn(Optional.of(existingPlayer));
         when(playerRepository.existsByUsernameAndIdNot("carlos.tt", playerId)).thenReturn(true);
 
         assertThatThrownBy(() -> playerService.updatePlayer(playerId, updateDto))
@@ -242,7 +246,7 @@ class PlayerServiceImplTest {
         Player existingPlayer = Player.builder().id(playerId).name("Carlos").build();
         PlayerUpdateRequestDTO updateDto = PlayerUpdateRequestDTO.builder().username("Carlos.TT").build();
 
-        when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
+        when(playerRepository.lockForUpdate(playerId)).thenReturn(Optional.of(existingPlayer));
         when(playerRepository.existsByUsernameAndIdNot("carlos.tt", playerId)).thenReturn(false);
         doNothing().when(modelMapper).map(updateDto, existingPlayer);
         when(playerRepository.save(existingPlayer)).thenReturn(existingPlayer);
@@ -362,7 +366,7 @@ class PlayerServiceImplTest {
                 .build();
 
         doNothing().when(modelMapper).map(updateDto, existingPlayer);
-        when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
+        when(playerRepository.lockForUpdate(playerId)).thenReturn(Optional.of(existingPlayer));
         when(playerRepository.save(existingPlayer)).thenReturn(updatedPlayer);
         when(modelMapper.map(updatedPlayer, PlayerResponseDTO.class)).thenReturn(expectedResponse);
 
@@ -393,7 +397,7 @@ class PlayerServiceImplTest {
         PlayerUpdateRequestDTO emptyUpdateDto = PlayerUpdateRequestDTO.builder().build();
 
         doNothing().when(modelMapper).map(emptyUpdateDto, existingPlayer);
-        when(playerRepository.findById(playerId)).thenReturn(Optional.of(existingPlayer));
+        when(playerRepository.lockForUpdate(playerId)).thenReturn(Optional.of(existingPlayer));
         when(playerRepository.save(existingPlayer)).thenReturn(existingPlayer);
         when(modelMapper.map(existingPlayer, PlayerResponseDTO.class)).thenReturn(PlayerResponseDTO.builder().id(playerId).name("Carlos Gomez").build());
 
@@ -421,7 +425,7 @@ class PlayerServiceImplTest {
     void deleteAccount_WrongPassword_ThrowsException() {
         actingAs(PLAYER_ID);
         Player player = playerWithPassword("hashed");
-        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player));
+        when(playerRepository.lockForUpdate(PLAYER_ID)).thenReturn(Optional.of(player));
         when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
 
         assertThatThrownBy(() -> playerService.deleteAccount(deleteRequest("wrong")))
@@ -435,7 +439,7 @@ class PlayerServiceImplTest {
     void deleteAccount_AdministersActiveClub_ThrowsException() {
         actingAs(PLAYER_ID);
         Player player = playerWithPassword("hashed");
-        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player));
+        when(playerRepository.lockForUpdate(PLAYER_ID)).thenReturn(Optional.of(player));
         when(passwordEncoder.matches("correct", "hashed")).thenReturn(true);
         when(clubRepository.existsByAdminIdAndStatusIn(PLAYER_ID, ClubStatus.ACTIVE_STATUSES)).thenReturn(true);
 
@@ -457,7 +461,7 @@ class PlayerServiceImplTest {
                 .id(1L).player(player).community(community)
                 .role(CommunityRole.COMMUNITY_ADMIN).status(MembershipStatus.ACTIVE).build();
 
-        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player));
+        when(playerRepository.lockForUpdate(PLAYER_ID)).thenReturn(Optional.of(player));
         when(passwordEncoder.matches("correct", "hashed")).thenReturn(true);
         when(clubRepository.existsByAdminIdAndStatusIn(PLAYER_ID, ClubStatus.ACTIVE_STATUSES)).thenReturn(false);
         when(communityMembershipRepository.findByPlayerIdWithCommunity(PLAYER_ID, MembershipStatus.ACTIVE))
@@ -485,7 +489,7 @@ class PlayerServiceImplTest {
         ClubMembership clubMembership = ClubMembership.builder()
                 .id(2L).player(player).status(ClubMembershipStatus.APPROVED).build();
 
-        when(playerRepository.findById(PLAYER_ID)).thenReturn(Optional.of(player));
+        when(playerRepository.lockForUpdate(PLAYER_ID)).thenReturn(Optional.of(player));
         when(passwordEncoder.matches("correct", "hashed")).thenReturn(true);
         when(clubRepository.existsByAdminIdAndStatusIn(PLAYER_ID, ClubStatus.ACTIVE_STATUSES)).thenReturn(false);
         when(communityMembershipRepository.findByPlayerIdWithCommunity(PLAYER_ID, MembershipStatus.ACTIVE))

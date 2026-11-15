@@ -6,10 +6,12 @@ import org.example.pongrankbackend.Player.dto.CategorySuggestionResponseDTO;
 import org.example.pongrankbackend.Player.dto.DeleteAccountRequestDTO;
 import org.example.pongrankbackend.Player.dto.InitialLevelResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerRegisterRequestDTO;
+import org.example.pongrankbackend.Player.dto.PlayerPresentationDTO;
 import org.example.pongrankbackend.Player.dto.PlayerResponseDTO;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Player.dto.PlayerUpdateRequestDTO;
 import org.example.pongrankbackend.Player.service.PlayerService;
+import org.example.pongrankbackend.Player.service.PlayerPresentationService;
 import org.example.pongrankbackend.common.pagination.PageRequestFactory;
 import org.example.pongrankbackend.common.pagination.PageResponseDTO;
 import org.springframework.http.HttpStatus;
@@ -25,8 +27,11 @@ public class PlayerController {
 
     private final PlayerService playerService;
 
-    public PlayerController(PlayerService playerService) {
+    private final PlayerPresentationService presentations;
+
+    public PlayerController(PlayerService playerService, PlayerPresentationService presentations) {
         this.playerService = playerService;
+        this.presentations = presentations;
     }
 
     @PostMapping("/register")
@@ -65,6 +70,18 @@ public class PlayerController {
     public ResponseEntity<PlayerSummaryDTO> getPlayerSummaryById(@PathVariable Long playerId) {
         PlayerSummaryDTO response = playerService.getPlayerSummaryById(playerId);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{playerId}/profile")
+    @PreAuthorize("isAuthenticated()")
+    public PlayerPresentationDTO getPlayerPresentation(@PathVariable Long playerId) {
+        return presentations.find(playerId);
+    }
+
+    @PutMapping("/me/profile")
+    @PreAuthorize("isAuthenticated()")
+    public PlayerPresentationDTO updateMyPresentation(@Valid @RequestBody PlayerPresentationDTO dto) {
+        return presentations.updateOwn(dto);
     }
 
     @PatchMapping("/{playerId}")

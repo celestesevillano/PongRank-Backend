@@ -28,11 +28,11 @@ class ModelMapperConfigTest {
     }
 
     @Test
-    @DisplayName("Player -> PlayerSummaryDTO: incluye el WhatsApp cuando shareContact=true")
-    void mapToPlayerSummaryDTO_ShareContactTrue_IncludesWhatsapp() {
+    @DisplayName("Player -> PlayerSummaryDTO: omite el WhatsApp aunque shareContact=true")
+    void mapToPlayerSummaryDTO_ShareContactTrue_HidesWhatsapp() {
         PlayerSummaryDTO dto = modelMapper.map(player(true), PlayerSummaryDTO.class);
 
-        assertThat(dto.getWhatsapp()).isEqualTo("+51999999999");
+        assertThat(dto.getWhatsapp()).isNull();
     }
 
     @Test
