@@ -355,7 +355,7 @@ class ClubServiceImplTest {
         Player newAdmin = player(OTHER_PLAYER_ID, Role.ROLE_USER);
         ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
 
-        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(clubRepository.findByIdForUpdate(CLUB_ID)).thenReturn(Optional.of(club));
         when(membershipService.canCreateClub(OTHER_PLAYER_ID)).thenReturn(true);
         when(clubMembershipService.transferAdminRole(club, OTHER_PLAYER_ID)).thenReturn(newAdmin);
 
@@ -372,7 +372,7 @@ class ClubServiceImplTest {
         Club club = club(ClubStatus.APPROVED);
         ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
 
-        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(clubRepository.findByIdForUpdate(CLUB_ID)).thenReturn(Optional.of(club));
         when(clubRepository.existsByAdminIdAndStatusInAndIdNot(OTHER_PLAYER_ID, ClubStatus.ACTIVE_STATUSES, CLUB_ID))
                 .thenReturn(true);
 
@@ -390,7 +390,7 @@ class ClubServiceImplTest {
         Club club = club(ClubStatus.APPROVED);
         ClubAdminTransferRequestDTO dto = ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build();
 
-        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club));
+        when(clubRepository.findByIdForUpdate(CLUB_ID)).thenReturn(Optional.of(club));
         when(membershipService.canCreateClub(OTHER_PLAYER_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID, dto))
@@ -405,7 +405,7 @@ class ClubServiceImplTest {
     @DisplayName("transferAdministration: un club que no está APPROVED no transfiere su administración")
     void transferAdministration_ClubNotApproved_ThrowsException() {
         actingAs(ADMIN_ID, Role.ROLE_USER);
-        when(clubRepository.findById(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
+        when(clubRepository.findByIdForUpdate(CLUB_ID)).thenReturn(Optional.of(club(ClubStatus.PENDING)));
 
         assertThatThrownBy(() -> clubService.transferAdministration(CLUB_ID,
                 ClubAdminTransferRequestDTO.builder().newAdminPlayerId(OTHER_PLAYER_ID).build()))

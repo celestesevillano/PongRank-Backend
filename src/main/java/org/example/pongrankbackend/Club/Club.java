@@ -35,6 +35,10 @@ public class Club {
     @Column(nullable = false, length = 250)
     private String address;
 
+    @Size(max = 500)
+    @Column(length = 500)
+    private String description;
+
     @NotNull
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -61,6 +65,9 @@ public class Club {
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    @Column(name = "plan_expires_at")
+    private LocalDateTime planExpiresAt;
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;

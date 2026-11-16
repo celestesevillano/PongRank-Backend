@@ -33,7 +33,10 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 
 
 @Service
@@ -47,6 +50,9 @@ public class ClubServiceImpl implements ClubService {
     private final MembershipService membershipService;
     private final ModelMapper modelMapper;
     private final SpaceQuotaService spaces;
+
+    @Value("${club.lifecycle.grace-hours:72}")
+    private long graceHours = 72;
 
     @Value("${club.max-administered.enterprise}")
     private int maxAdministeredEnterprise;
@@ -103,21 +109,21 @@ public class ClubServiceImpl implements ClubService {
         var clubs = name == null || name.isBlank()
                 ? clubRepository.findByStatus(ClubStatus.APPROVED, pageable)
                 : clubRepository.findByStatusAndNameContainingIgnoreCase(ClubStatus.APPROVED, name.strip(), pageable);
-        return PageResponseDTO.from(clubs, club -> modelMapper.map(club, ClubResponseDTO.class));
+        return PageResponseDTO.from(clubs, this::describe);
     }
 
     @Override
     public List<ClubResponseDTO> getManagedClubs() {
         return clubRepository.findByAdminIdOrderByUpdatedAtDesc(SecurityUtils.getRequiredCurrentUserId())
                 .stream()
-                .map(club -> modelMapper.map(club, ClubResponseDTO.class))
+                .map(this::describe)
                 .toList();
     }
 
     @Override
     public ClubResponseDTO getClubById(Long clubId) {
         Club club = findClubById(clubId);
-        return modelMapper.map(club, ClubResponseDTO.class);
+        return describe(club);
     }
 
     @Override
@@ -126,6 +132,9 @@ public class ClubServiceImpl implements ClubService {
         Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClubById(clubId);
         validateClubAdmin(club, actingPlayerId);
+        if (club.getStatus() == ClubStatus.PAUSED || club.getStatus() == ClubStatus.DELETED) {
+            throw new ConflictException("El club ya no admite cambios");
+        }
 
         if (dto.getName() != null) {
             String normalizedName = dto.getName().trim();
@@ -137,6 +146,10 @@ public class ClubServiceImpl implements ClubService {
 
         if (dto.getAddress() != null) {
             club.setAddress(dto.getAddress().trim());
+        }
+
+        if (dto.getDescription() != null) {
+            club.setDescription(dto.getDescription().strip());
         }
 
         Club updatedClub = clubRepository.saveAndFlush(club);
@@ -175,6 +188,9 @@ public class ClubServiceImpl implements ClubService {
         Club club = findClubById(clubId);
         validateClubAdmin(club, actingPlayerId);
 
+        if (club.getStatus() == ClubStatus.PAUSED || club.getStatus() == ClubStatus.DELETED) {
+            throw new ConflictException("El club ya no admite cambios");
+        }
         if (club.getStatus() == ClubStatus.REJECTED) {
             throw new ConflictException("Un club rechazado debe reemplazar su documento al reenviarse a revisión");
         }
@@ -184,16 +200,68 @@ public class ClubServiceImpl implements ClubService {
 
     @Override
     @Transactional
+    public void deleteClub(Long clubId) {
+        Club club = clubRepository.findByIdForUpdate(clubId)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos el club"));
+        validateClubAdmin(club, SecurityUtils.getRequiredCurrentUserId());
+        club.setStatus(ClubStatus.DELETED);
+    }
+
+    @Override
+    public List<PlayerSummaryDTO> transferCandidates(Long clubId) {
+        Long admin = SecurityUtils.getRequiredCurrentUserId();
+        Club club = findClubById(clubId);
+        validateClubAdmin(club, admin);
+        validateTransferWindow(club);
+        List<PlayerSummaryDTO> candidates = new ArrayList<>();
+        for (int page = 0; ; page++) {
+            var result = clubMembershipService.getActiveMembers(clubId, page, 100);
+            for (var membership : result.getContent()) {
+                PlayerSummaryDTO player = membership.getPlayer();
+                if (!admin.equals(player.getId()) && canReceiveClub(player.getId(), clubId)) {
+                    candidates.add(player);
+                }
+            }
+            if (result.isLast()) {
+                return candidates;
+            }
+        }
+    }
+
+    private boolean canReceiveClub(Long playerId, Long clubId) {
+        return membershipService.canCreateClub(playerId)
+                && !clubRepository.existsByAdminIdAndStatusInAndIdNot(playerId, ClubStatus.ACTIVE_STATUSES, clubId);
+    }
+
+    private void validateTransferWindow(Club club) {
+        if ((club.getStatus() != ClubStatus.APPROVED && club.getStatus() != ClubStatus.PAUSED)
+                || (club.getPlanExpiresAt() != null && !LocalDateTime.now().isBefore(club.getPlanExpiresAt().plusHours(graceHours)))) {
+            throw new ConflictException("El club ya no permite transferir la administración");
+        }
+    }
+
+    private ClubResponseDTO describe(Club club) {
+        ClubResponseDTO dto = modelMapper.map(club, ClubResponseDTO.class);
+        if (dto != null && club.getStatus() == ClubStatus.PAUSED && club.getPlanExpiresAt() != null) {
+            dto.setDeletionScheduledAt(club.getPlanExpiresAt().plusHours(graceHours));
+        }
+        return dto;
+    }
+
+    @Override
+    @Transactional
     public ClubResponseDTO transferAdministration(Long clubId, ClubAdminTransferRequestDTO dto) {
         Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
-        Club club = findClubById(clubId);
+        Club club = clubRepository.findByIdForUpdate(clubId)
+                .orElseThrow(() -> new ResourceNotFoundException("No encontramos el club"));
         validateClubAdmin(club, actingPlayerId);
-        validateClubStatus(club, ClubStatus.APPROVED, "Solo un club aprobado puede transferir su administración");
+        validateTransferWindow(club);
 
         if (actingPlayerId.equals(dto.getNewAdminPlayerId())) {
             throw new ConflictException("El nuevo administrador debe ser un jugador distinto al actual");
         }
 
+        playerRepository.lockForSpaceAllocation(dto.getNewAdminPlayerId());
         if (clubRepository.existsByAdminIdAndStatusInAndIdNot(dto.getNewAdminPlayerId(), ClubStatus.ACTIVE_STATUSES, clubId)) {
             throw new ConflictException("El nuevo administrador ya administra otro club en revisión o aprobado");
         }
@@ -204,6 +272,8 @@ public class ClubServiceImpl implements ClubService {
 
         Player newAdmin = clubMembershipService.transferAdminRole(club, dto.getNewAdminPlayerId());
         club.setAdmin(newAdmin);
+        club.setStatus(ClubStatus.APPROVED);
+        club.setPlanExpiresAt(membershipService.getActivePlanEndDate(newAdmin.getId()).orElse(null));
 
         Club updatedClub = clubRepository.saveAndFlush(club);
         return modelMapper.map(updatedClub, ClubResponseDTO.class);
@@ -228,6 +298,7 @@ public class ClubServiceImpl implements ClubService {
         validateCanAdministerClub(club.getAdmin().getId(), clubId);
 
         club.setStatus(ClubStatus.APPROVED);
+        club.setPlanExpiresAt(membershipService.getActivePlanEndDate(club.getAdmin().getId()).orElse(null));
         club.setRejectionReason(null);
         Club approvedClub = clubRepository.saveAndFlush(club);
 
