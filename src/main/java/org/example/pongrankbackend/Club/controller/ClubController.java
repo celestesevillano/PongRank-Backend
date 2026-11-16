@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.Club.controller;
 
+import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import jakarta.validation.Valid;
 import org.example.pongrankbackend.Club.dto.ClubAdminTransferRequestDTO;
 import org.example.pongrankbackend.Club.dto.ClubAffiliationDocumentRequestDTO;
@@ -88,6 +89,19 @@ public class ClubController {
             @Valid @RequestBody ClubAffiliationDocumentRequestDTO dto) {
         ClubResponseDTO response = clubService.replaceAffiliationDocument(clubId, dto);
         return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{clubId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Void> deleteClub(@PathVariable Long clubId) {
+        clubService.deleteClub(clubId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{clubId}/transfer-candidates")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<PlayerSummaryDTO>> transferCandidates(@PathVariable Long clubId) {
+        return ResponseEntity.ok(clubService.transferCandidates(clubId));
     }
 
     @PatchMapping("/{clubId}/admin")

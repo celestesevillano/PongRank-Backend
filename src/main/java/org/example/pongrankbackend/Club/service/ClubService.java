@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.Club.service;
 
+import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 import org.example.pongrankbackend.Club.dto.ClubAdminTransferRequestDTO;
 import org.example.pongrankbackend.Club.dto.ClubAffiliationDocumentRequestDTO;
 import org.example.pongrankbackend.Club.dto.ClubRegisterRequestDTO;
@@ -31,6 +32,10 @@ public interface ClubService {
     ClubResponseDTO resubmitClub(Long clubId, ClubResubmitRequestDTO dto);
 
     ClubResponseDTO replaceAffiliationDocument(Long clubId, ClubAffiliationDocumentRequestDTO dto);
+
+    void deleteClub(Long clubId);
+
+    List<PlayerSummaryDTO> transferCandidates(Long clubId);
 
     ClubResponseDTO transferAdministration(Long clubId, ClubAdminTransferRequestDTO dto);
 

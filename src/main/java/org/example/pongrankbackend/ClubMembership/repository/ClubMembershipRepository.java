@@ -23,7 +23,8 @@ public interface ClubMembershipRepository extends JpaRepository<ClubMembership, 
     @Query("""
             SELECT COUNT(DISTINCT m.club.id) FROM ClubMembership m
             WHERE m.player.id = :playerId AND m.status IN :statuses
-              AND m.club.status = :clubStatus AND m.club.admin.id <> :playerId
+              AND (m.club.status = :clubStatus OR m.club.status = org.example.pongrankbackend.Club.ClubStatus.PAUSED)
+              AND m.club.admin.id <> :playerId
             """)
     long countDistinctOtherClubs(@Param("playerId") Long playerId,
                                  @Param("statuses") Collection<ClubMembershipStatus> statuses,

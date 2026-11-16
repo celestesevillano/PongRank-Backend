@@ -1,6 +1,8 @@
 package org.example.pongrankbackend.ClubAnnouncement.service;
 
 import org.example.pongrankbackend.Club.Club;
+import org.example.pongrankbackend.Club.ClubStatus;
+import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.Club.repository.ClubRepository;
 import org.example.pongrankbackend.ClubAnnouncement.ClubAnnouncement;
 import org.example.pongrankbackend.ClubAnnouncement.dto.ClubAnnouncementRequestDTO;
@@ -38,6 +40,9 @@ public class ClubAnnouncementServiceImpl implements ClubAnnouncementService {
     public ClubAnnouncementResponseDTO publish(Long clubId, ClubAnnouncementRequestDTO dto) {
         Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClub(clubId);
+        if (club.getStatus() == ClubStatus.PAUSED || club.getStatus() == ClubStatus.DELETED) {
+            throw new ConflictException("El club está inactivo");
+        }
         if (!club.getAdmin().getId().equals(actingPlayerId)) {
             throw new UnauthorizedActionException("Solo el administrador del club puede publicar avisos");
         }
@@ -54,6 +59,9 @@ public class ClubAnnouncementServiceImpl implements ClubAnnouncementService {
     public PageResponseDTO<ClubAnnouncementResponseDTO> list(Long clubId, int page, int size) {
         Long actingPlayerId = SecurityUtils.getRequiredCurrentUserId();
         Club club = findClub(clubId);
+        if (club.getStatus() == ClubStatus.PAUSED || club.getStatus() == ClubStatus.DELETED) {
+            throw new ConflictException("El club está inactivo");
+        }
         boolean isAdmin = club.getAdmin().getId().equals(actingPlayerId);
         boolean isMember = clubMembershipRepository
                 .findByPlayerIdAndClubIdAndStatus(actingPlayerId, clubId, ClubMembershipStatus.APPROVED)

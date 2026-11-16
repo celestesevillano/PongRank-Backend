@@ -18,8 +18,11 @@ public class ClubResponseDTO {
     private Long id;
     private String name;
     private String address;
+    private String description;
     private ClubStatus status;
     private PlayerSummaryDTO admin;
+    private LocalDateTime planExpiresAt;
+    private LocalDateTime deletionScheduledAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

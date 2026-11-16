@@ -18,6 +18,7 @@ public class ClubReviewResponseDTO {
     private Long id;
     private String name;
     private String address;
+    private String description;
     private ClubStatus status;
     private String affiliationDocumentUrl;
     private String rejectionReason;
