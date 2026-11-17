@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.Tournament.service;
 
+import org.example.pongrankbackend.Match.Match;
 import org.example.pongrankbackend.Tournament.Tournament;
 import org.example.pongrankbackend.Tournament.TournamentMatch;
 import org.example.pongrankbackend.Tournament.TournamentMatchStatus;
@@ -15,6 +16,7 @@ import org.example.pongrankbackend.Tournament.repository.TournamentRepository;
 import org.example.pongrankbackend.common.exception.ConflictException;
 import org.example.pongrankbackend.common.exception.InvalidMatchStateException;
 import org.example.pongrankbackend.common.exception.ResourceNotFoundException;
+import org.example.pongrankbackend.common.exception.UnauthorizedActionException;
 import org.example.pongrankbackend.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,10 +58,33 @@ public class TournamentResultsServiceImpl implements TournamentResultsService {
         TournamentMatch match = tournamentMatchRepository.findById(tournamentMatchId)
                 .filter(m -> m.getTournament().getId().equals(tournamentId))
                 .orElseThrow(() -> new ResourceNotFoundException("Partido del torneo no encontrado con ID: " + tournamentMatchId));
+        return closeFixture(tournament, match, dto.getAbsentPlayerId());
+    }
+
+    @Override
+    @Transactional
+    public TournamentMatchResponseDTO withdraw(Long matchId) {
+        Long playerId = SecurityUtils.getRequiredCurrentUserId();
+        TournamentMatch match = tournamentMatchRepository.findByMatchId(matchId)
+                .filter(fixture -> fixture.getTournament().isDirectElimination())
+                .orElseThrow(() -> new ResourceNotFoundException("Partido de eliminación directa no encontrado"));
+        if (!match.hasPlayer(playerId)) {
+            throw new UnauthorizedActionException("Solo un participante puede retirarse de su partido");
+        }
+        Tournament tournament = match.getTournament();
+        accessPolicy.validateInProgress(tournament);
+        Match game = match.getMatch();
+        if (game.getPlayer1ReadyAt() != null && game.getPlayer2ReadyAt() != null) {
+            throw new ConflictException("El partido ya comenzó");
+        }
+        return closeFixture(tournament, match, playerId);
+    }
+
+    private TournamentMatchResponseDTO closeFixture(Tournament tournament, TournamentMatch match, Long absentPlayerId) {
         if (match.getStatus() != TournamentMatchStatus.SCHEDULED) {
             throw new ConflictException("Solo se puede declarar W.O. en un partido programado y sin resultado");
         }
-        if (!match.hasPlayer(dto.getAbsentPlayerId())) {
+        if (!match.hasPlayer(absentPlayerId)) {
             throw new InvalidMatchStateException("El jugador ausente no participa en este partido");
         }
         // A W.O. never overwrites a score already reported in the Match module
@@ -67,7 +92,7 @@ public class TournamentResultsServiceImpl implements TournamentResultsService {
             throw new ConflictException("El partido ya tiene un marcador reportado en Match; no se puede declarar W.O.");
         }
 
-        boolean player1Absent = match.getPlayer1().getId().equals(dto.getAbsentPlayerId());
+        boolean player1Absent = match.getPlayer1().getId().equals(absentPlayerId);
         match.setWinner(player1Absent ? match.getPlayer2() : match.getPlayer1());
         match.setStatus(TournamentMatchStatus.WALKOVER);
 

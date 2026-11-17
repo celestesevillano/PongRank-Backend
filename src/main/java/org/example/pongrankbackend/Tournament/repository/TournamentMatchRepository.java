@@ -5,6 +5,9 @@ import org.example.pongrankbackend.Tournament.TournamentStage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +18,7 @@ public interface TournamentMatchRepository extends JpaRepository<TournamentMatch
 
     List<TournamentMatch> findByTournamentIdAndStage(Long tournamentId, TournamentStage stage);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<TournamentMatch> findByTournamentIdAndStageAndRoundAndBracketPosition(
             Long tournamentId, TournamentStage stage, Integer round, Integer bracketPosition);
 

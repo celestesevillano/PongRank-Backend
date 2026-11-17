@@ -8,6 +8,7 @@ import org.example.pongrankbackend.Match.repository.MatchRepository;
 import org.example.pongrankbackend.Match.service.MatchService;
 import org.example.pongrankbackend.MatchSet.dto.MatchSetResponseDTO;
 import org.example.pongrankbackend.Player.Player;
+import org.example.pongrankbackend.Tournament.Tournament;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -46,6 +47,11 @@ public class ProvisionalMatchIntegrationAdapter implements MatchIntegrationPort 
                 .status(MatchStatus.CREATED)
                 .build();
         return matchRepository.save(match);
+    }
+
+    @Override
+    public Match createLinkedMatch(Player player1, Player player2, Tournament tournament) {
+        return matchService.createTournamentMatch(player1, player2, tournament, tournament.getMatchFormat());
     }
 
     @Override

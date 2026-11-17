@@ -9,6 +9,8 @@ public interface TournamentResultsService {
     TournamentMatchResponseDTO declareWalkover(Long tournamentId, Long tournamentMatchId,
                                                TournamentWalkoverRequestDTO dto);
 
+    TournamentMatchResponseDTO withdraw(Long matchId);
+
     TournamentResponseDTO syncMatchResults(Long tournamentId);
 
     void applyConfirmedMatch(Long matchId);

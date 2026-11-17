@@ -22,7 +22,9 @@ public class TournamentMatchScheduler {
         }
         // Never create a second real Match for the same tournament match
         if (match.getMatch() == null) {
-            match.setMatch(matchIntegrationPort.createMatch(match.getPlayer1(), match.getPlayer2(), tournament.getMatchFormat()));
+            match.setMatch(tournament.isDirectElimination()
+                    ? matchIntegrationPort.createLinkedMatch(match.getPlayer1(), match.getPlayer2(), tournament)
+                    : matchIntegrationPort.createMatch(match.getPlayer1(), match.getPlayer2(), tournament.getMatchFormat()));
         }
         match.setStatus(TournamentMatchStatus.SCHEDULED);
     }

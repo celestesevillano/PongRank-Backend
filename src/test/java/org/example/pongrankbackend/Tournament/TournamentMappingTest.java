@@ -42,6 +42,13 @@ class TournamentMappingTest {
     }
 
     @Test
+    void mapsDirectElimination() {
+        assertThat(modelMapper.map(tournament, TournamentResponseDTO.class).isDirectElimination()).isFalse();
+        tournament.setPublicationKey("cup-request");
+        assertThat(modelMapper.map(tournament, TournamentResponseDTO.class).isDirectElimination()).isTrue();
+    }
+
+    @Test
     @DisplayName("TournamentParticipant -> DTO: mapea jugador, siembra y grupo")
     void mapsParticipant() {
         TournamentParticipant participant = TournamentParticipant.builder()
