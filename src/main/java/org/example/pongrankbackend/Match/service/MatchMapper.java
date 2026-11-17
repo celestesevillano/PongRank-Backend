@@ -67,6 +67,7 @@ public class MatchMapper {
                 .winnerId(winnerId)
                 .ratingDeltaP1(match.getRatingDeltaP1())
                 .ratingDeltaP2(match.getRatingDeltaP2())
+                .scheduledAt(match.getScheduledAt())
                 .createdAt(match.getCreatedAt())
                 .confirmedAt(match.getConfirmedAt())
                 .build();
@@ -131,6 +132,7 @@ public class MatchMapper {
                 .ratingDeltaP1(base.getRatingDeltaP1())
                 .ratingDeltaP2(base.getRatingDeltaP2())
                 .disputeReason(match.getDisputeReason())
+                .scheduledAt(base.getScheduledAt())
                 .createdAt(base.getCreatedAt())
                 .confirmedAt(base.getConfirmedAt())
                 .sets(setDTOs)

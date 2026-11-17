@@ -57,6 +57,13 @@ public class MatchResultServiceImpl implements MatchResultService {
         boolean isP1 = validateSubmittingParticipant(match, submittingPlayerId);
         validateSubmittableState(match);
 
+        if (match.getPlayer1ReadyAt() != null || match.getPlayer2ReadyAt() != null) {
+            LiveScore live = LiveScore.from(match.getLivePoints(), match.getFormat());
+            if (!live.finished() || !live.sets().equals(dto.getSets())) {
+                throw new ConflictException("El resultado debe coincidir con el marcador en vivo completado.");
+            }
+        }
+
         // Reglas de juego ITTF (sets a 11, ventaja de 2, deuce, formato BO3/BO5/BO7 y corte inmediato)
         matchRuleValidator.validateSetScoresAndDetermineWinner(match.getFormat(), dto.getSets());
         replaceMatchSets(match, dto.getSets());
