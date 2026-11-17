@@ -1,18 +1,17 @@
 # PongRank — Plataforma Social y Competitiva para Tenis de Mesa
 
-**Curso:** CS 2031 — Desarrollo Basado en Plataformas · **Entrega:** Semana 7
+**Curso:** CS 2031 — Desarrollo Basado en Plataformas · **Entrega:** Semana 14
 **Repositorio:** https://github.com/celestesevillano/PongRank-Backend
-**Despliegue:** http://54.80.228.129:8080 (AWS EC2 + RDS)
+**Despliegue:** https://pongrank-api.duckdns.org (AWS EC2 + RDS)
 
-### Integrantes
+### Integrantes y participación
 
-| Nombre completo | Código |
-| :--- | :--- |
-| Andrea Alejandra Vidal Coello | 202410193 |
-| Treicy Calsina Gutiérrez | 202520007 |
-| Adriana Celeste Sevillano Común | 202310146 |
-| Adriana Celeste Alvarado León | 202420154 |
-| Emiliano Efraín Jesús Chambi Mamani | 202310178 |
+| Integrante | Código | Aportes principales | Participación |
+| :--- | :--- | :--- | :--- |
+| Adriana Celeste Sevillano Común | 202310146 | Backend, sistema de diseño, pantallas y flujos de Mobile, pruebas y coordinación | 100 % |
+| Treicy Calsina Gutiérrez | 202520007 | Despliegue, URLs y usuarios para la demo | 100 % |
+| Adriana Celeste Alvarado León | 202420154 | Coach de postura en Mobile; partidas, Inicio, estadísticas, onboarding e inicio de sesión en Web | 100 % |
+| Andrea Alejandra Vidal Coello | 202410193 | Revisión del proyecto y flujo de amistad (Pongmigos) | 100 % |
 
 ### Índice
 
