@@ -2,17 +2,16 @@
 
 **Curso:** CS 2031 — Desarrollo Basado en Plataformas · **Entrega:** Semana 7
 **Repositorio:** https://github.com/celestesevillano/PongRank-Backend
-**Despliegue:** http://54.80.228.129:8080 (AWS EC2 + RDS)
+**Despliegue:** https://pongrank-api.duckdns.org (AWS EC2 + RDS)
 
-### Integrantes
+### Participación
 
-| Nombre completo | Código |
-| :--- | :--- |
-| Andrea Alejandra Vidal Coello | 202410193 |
-| Treicy Calsina Gutiérrez | 202520007 |
-| Adriana Celeste Sevillano Común | 202310146 |
-| Adriana Celeste Alvarado León | 202420154 |
-| Emiliano Efraín Jesús Chambi Mamani | 202310178 |
+| Nombre completo | Código | Aportes principales | Participación |
+| :--- | :--- | :--- | :---: |
+| Adriana Celeste Sevillano Común | 202310146 | Mayor parte del desarrollo: backend, sistema de diseño, pantallas y flujos de Mobile, pruebas y coordinación | 100 % |
+| Treicy Calsina Gutiérrez | 202520007 | Despliegue y levantamiento de todas las URLs; creación y gestión de usuarios para la demo | 100 % |
+| Adriana Celeste Alvarado León | 202420154 | Coach de postura y flujo de Partidas | 100 % |
+| Andrea Alejandra Vidal Coello | 202410193 | Revisión del proyecto y flujo de amistad (Pongmigos) | 100 % |
 
 ### Índice
 
@@ -166,7 +165,7 @@ cd PongRank-Backend && docker compose up -d
 cp .env.example .env && ./mvnw spring-boot:run
 ```
 
-La API queda en `http://localhost:8080`. La instancia desplegada está en `http://54.80.228.129:8080` (AWS EC2 + RDS). La colección **`postman_collection.json`** está en la raíz, con los **80 endpoints** documentados, variables y autorización Bearer: basta ejecutar *Login* y el token se guarda solo.
+La API queda en `http://localhost:8080`. La instancia desplegada está en `https://pongrank-api.duckdns.org` (AWS EC2 + RDS). La colección **`postman_collection.json`** está en la raíz, con los **80 endpoints** documentados, variables y autorización Bearer: basta ejecutar *Login* y el token se guarda solo.
 
 Rutas base bajo `/api/v1`: `auth` (6, incluye `/forgot-password` y `/reset-password`), `players` (5, incluye `DELETE /players/me`), `friendships` (5), `communities` (11), `matches` y `match-sets` (13, incluye `GET /matches/open` y `POST /{id}/join`), `clubs`, `club-memberships` y `admin/clubs` (20), `tournaments` (14), `training-sessions` (3) y `payments` (3).
 
