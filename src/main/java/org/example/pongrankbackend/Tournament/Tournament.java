@@ -58,6 +58,9 @@ public class Tournament {
     @Builder.Default
     private TournamentStatus status = TournamentStatus.OPEN;
 
+    @Column(name = "publication_key", length = 64)
+    private String publicationKey;
+
     @Column(name = "start_date")
     private LocalDateTime startDate;
 
@@ -69,6 +72,10 @@ public class Tournament {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+
+    public boolean isDirectElimination() {
+        return publicationKey != null;
+    }
 
     @PrePersist
     protected void onCreate() {

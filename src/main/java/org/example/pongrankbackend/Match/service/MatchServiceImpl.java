@@ -235,6 +235,10 @@ public class MatchServiceImpl implements MatchService {
             throw new UnauthorizedActionException("Solo un jugador participante puede cancelar el partido");
         }
 
+        if (match.getTournament() != null && match.getTournament().isDirectElimination()) {
+            throw new InvalidMatchStateException("Usa el retiro de torneo para avanzar al rival en la llave");
+        }
+
         if (match.getStatus() == MatchStatus.CONFIRMED) {
             throw new InvalidMatchStateException("No se puede cancelar un partido que ya ha sido confirmado");
         }
