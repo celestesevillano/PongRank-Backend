@@ -10,6 +10,7 @@ import org.example.pongrankbackend.Match.MatchType;
 import org.example.pongrankbackend.Player.dto.PlayerSummaryDTO;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Data
@@ -30,6 +31,8 @@ public class MatchResponseDTO {
     private MatchStatus status;
     private BigDecimal latitude;
     private BigDecimal longitude;
+
+    private Instant scheduledAt;
     private String scoreSummary;
     private Long winnerId;
     private Double ratingDeltaP1;

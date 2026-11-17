@@ -1,5 +1,6 @@
 package org.example.pongrankbackend.Match.dto;
 
+import jakarta.validation.constraints.Future;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,6 +10,7 @@ import org.example.pongrankbackend.Match.MatchFormat;
 import org.example.pongrankbackend.Match.MatchType;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 
 @Data
 @NoArgsConstructor
@@ -31,6 +33,9 @@ public class MatchCreateRequestDTO {
     private BigDecimal latitude;
 
     private BigDecimal longitude;
+
+    @Future(message = "La hora programada debe ser futura")
+    private Instant scheduledAt;
 
     private BigDecimal opponentLatitude;
 

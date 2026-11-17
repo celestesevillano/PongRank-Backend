@@ -85,6 +85,7 @@ public class MatchServiceImpl implements MatchService {
                 .community(community)
                 .tournament(tournament)
                 .format(dto.getFormat())
+                .scheduledAt(dto.getScheduledAt())
                 .matchType(dto.getMatchType())
                 .status(MatchStatus.CREATED)
                 .latitude(dto.getLatitude())

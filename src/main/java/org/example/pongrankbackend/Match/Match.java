@@ -9,6 +9,7 @@ import org.example.pongrankbackend.Player.Player;
 import org.example.pongrankbackend.Tournament.Tournament;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -74,6 +75,15 @@ public class Match {
 
     @Column(precision = 9, scale = 6)
     private BigDecimal longitude;
+
+    @Column(name = "scheduled_at")
+    private Instant scheduledAt;
+
+    private Instant player1ReadyAt;
+    private Instant player2ReadyAt;
+
+    @Column(columnDefinition = "text")
+    private String livePoints;
 
     @Column(name = "rating_delta_p1")
     private Double ratingDeltaP1;
