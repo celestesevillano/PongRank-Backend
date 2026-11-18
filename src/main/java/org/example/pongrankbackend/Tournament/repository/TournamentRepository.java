@@ -11,4 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface TournamentRepository extends JpaRepository<Tournament, Long> {
 
     Page<Tournament> findByClubId(Long clubId, Pageable pageable);
+
+    java.util.Optional<Tournament> findFirstByClubIdAndPublicationKey(Long clubId, String publicationKey);
 }

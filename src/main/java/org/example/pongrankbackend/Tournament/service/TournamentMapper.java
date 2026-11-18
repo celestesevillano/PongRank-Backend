@@ -19,7 +19,11 @@ public class TournamentMapper {
     }
 
     public TournamentResponseDTO toResponse(Tournament tournament) {
-        return modelMapper.map(tournament, TournamentResponseDTO.class);
+        TournamentResponseDTO response = modelMapper.map(tournament, TournamentResponseDTO.class);
+        if (response != null) {
+            response.setDirectElimination(Boolean.TRUE.equals(tournament.getDirectElimination()));
+        }
+        return response;
     }
 
     public TournamentParticipantResponseDTO toParticipantResponse(TournamentParticipant participant) {
