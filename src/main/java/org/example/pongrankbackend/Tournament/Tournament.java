@@ -58,6 +58,15 @@ public class Tournament {
     @Builder.Default
     private TournamentStatus status = TournamentStatus.OPEN;
 
+    // Direct-elimination tournaments skip the group stage: the bracket is published when the tournament is created
+    @Column(name = "direct_elimination")
+    @Builder.Default
+    private Boolean directElimination = false;
+
+    // Client-generated key that makes publishing idempotent (a retry returns the same tournament)
+    @Column(name = "publication_key", length = 80)
+    private String publicationKey;
+
     @Column(name = "start_date")
     private LocalDateTime startDate;
 

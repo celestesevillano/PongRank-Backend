@@ -25,6 +25,7 @@ public class TournamentResponseDTO {
     private MatchFormat matchFormat;
     private TournamentStatus status;
     private Boolean manualSeeding;
+    private Boolean directElimination;
     private PlayerSummaryDTO winner;
     private LocalDateTime startDate;
     private LocalDateTime endDate;
